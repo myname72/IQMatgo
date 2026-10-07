@@ -41,14 +41,12 @@ export function createGame(difficulty, rng = Math.random) {
     pendingTurnEnd: null,
     rewardEvent: null,
     bonus: { player: 0, ai: 0 },
-    combo: { player: 0, ai: 0 },
     message: '당신의 턴입니다. 카드 2장을 뒤집으세요!',
     result: null,
   };
 }
 
 export const scoreOf = (state, who) => calculateScore(state.captured[who]) + (state.bonus?.[who] ?? 0);
-const COMBO_EVERY = 3; // 연속으로 이만큼 짝을 맞출 때마다 보너스
 
 const whoLabel = (who) => (who === 'player' ? '당신' : 'AI');
 
@@ -228,7 +226,7 @@ export function resolveFlip(state) {
       }
     }
     const lastHidden = [...new Set([...hidden, ...(turns ? [] : [i, j])])];
-    return finishTurn({ ...state, flipped: [], revealed, revealLeft, lastHidden, combo: { ...state.combo, [who]: 0 } }, who, 'miss');
+    return finishTurn({ ...state, flipped: [], revealed, revealLeft, lastHidden }, who, 'miss');
   }
 
   const deck = state.deck.map((s, k) => (k === i || k === j ? { ...s, taken: true } : s));
@@ -247,14 +245,11 @@ export function resolveFlip(state) {
 
   if (remainingNormal(next) === 0) return settleEnd(next);
 
-  // 보너스: 판쓸·쪽·따닥·폭탄·콤보는 상대의 피를 가져온다 (판쓸은 +1점도 더한다)
+  // 보너스: 판쓸·쪽·폭탄은 상대의 피를 가져온다 (판쓸은 +1점도 더한다)
   const rewards = [];
-  next.combo = { ...state.combo, [who]: state.combo[who] + 1 };
   if (state.revealed.length > 0 && next.revealed.length === 0) rewards.push({ kind: 'sweep', label: '판쓸', pi: 1, bonus: 1 });
   if (state.tries === 0 && !state.revealed.includes(i) && !state.revealed.includes(j)) rewards.push({ kind: 'jjok', label: '쪽', pi: 1 });
-  if (state.tries === 1) rewards.push({ kind: 'ddadak', label: '따닥', pi: 1 });
   if (state.revealed.filter((k) => state.deck[k].card.month === a.month).length >= 3) rewards.push({ kind: 'bomb', label: '폭탄', pi: 2 });
-  if (next.combo[who] % COMBO_EVERY === 0) rewards.push({ kind: 'combo', label: `${next.combo[who]}콤보`, pi: 1 });
   if (rewards.length) {
     const r = applyRewards(next, who, rewards);
     Object.assign(next, r.state, {

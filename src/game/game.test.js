@@ -447,7 +447,6 @@ describe('아이템 패', () => {
     g.revealed = [...ms];
     g.revealLeft = { [ms[0]]: 3, [ms[1]]: 3 };
     g.captured.ai = fill('pi', 3);
-    g.tries = 1; // 따닥과 구분
     g = resolveFlip(flipCard(flipCard(g, ms[0]), ms[1]));
     expect(g.rewardEvent.rewards.map((r) => r.kind)).toContain('sweep');
     expect(g.captured.ai).toHaveLength(3 - g.rewardEvent.stolen.length);
@@ -472,15 +471,6 @@ describe('아이템 패', () => {
     expect(g.captured.ai).toHaveLength(2);
   });
 
-  it('따닥: 한 턴에 두 번 연속 맞추면 상대 피 한 장', () => {
-    let g = createGame('normal');
-    g.captured.ai = fill('pi', 3);
-    g.tries = 1;
-    const [x, y] = pairOf(g, 4);
-    g = resolveFlip(flipCard(flipCard(g, x), y));
-    expect(g.rewardEvent.rewards.map((r) => r.kind)).toEqual(['ddadak']);
-  });
-
   it('폭탄: 열린 같은 월 3장이 있을 때 맞추면 피 2장', () => {
     let g = createGame('easy');
     g.captured.ai = fill('pi', 4);
@@ -490,19 +480,5 @@ describe('아이템 패', () => {
     g = resolveFlip(flipCard(flipCard(g, cards[0]), cards[1]));
     expect(g.rewardEvent.rewards.map((r) => r.kind)).toContain('bomb');
     expect(g.captured.ai).toHaveLength(2);
-  });
-
-  it('콤보: 3번 연속 맞추면 피 한 장, 틀리면 콤보가 끊긴다', () => {
-    let g = createGame('normal');
-    g.captured.ai = fill('pi', 5);
-    g.combo = { player: 2, ai: 0 };
-    const [x, y] = pairOf(g, 4);
-    g.tries = 0;
-    g = resolveFlip(flipCard(flipCard(g, x), y));
-    expect(g.rewardEvent.rewards.map((r) => r.kind)).toContain('combo');
-    const i = g.deck.findIndex((s) => !s.taken && s.card.month === 1);
-    const j = g.deck.findIndex((s) => !s.taken && s.card.month === 2);
-    g = resolveFlip(flipCard(flipCard(g, i), j));
-    expect(g.combo.player).toBe(0);
   });
 });
