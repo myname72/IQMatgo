@@ -1,0 +1,53 @@
+name: Check Firebase setup
+
+# 배포하지 않고 설정만 점검한다 (수동 실행). 비밀 값은 출력하지 않는다.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check secret and variable are set
+        env:
+          SA_JSON: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          PROJECT_ID: ${{ vars.FIREBASE_PROJECT_ID }}
+        run: |
+          fail=0
+          if [ -z "$SA_JSON" ]; then echo "FAIL: secret FIREBASE_SERVICE_ACCOUNT is empty or missing"; fail=1; else echo "OK: secret FIREBASE_SERVICE_ACCOUNT is set"; fi
+          if [ -z "$PROJECT_ID" ]; then echo "FAIL: variable FIREBASE_PROJECT_ID is empty or missing"; fail=1; else echo "OK: variable FIREBASE_PROJECT_ID is set: $PROJECT_ID"; fi
+          if [ "$fail" -eq 1 ]; then exit 1; fi
+          echo "$SA_JSON" | jq -e . >/dev/null 2>&1 || { echo "FAIL: secret is not valid JSON"; exit 1; }
+          echo "OK: secret is valid JSON"
+          type=$(echo "$SA_JSON" | jq -r '.type // "missing"')
+          sa_project=$(echo "$SA_JSON" | jq -r '.project_id // "missing"')
+          has_key=$(echo "$SA_JSON" | jq -r 'if .private_key then "yes" else "no" end')
+          echo "key type: $type"
+          echo "key project_id: $sa_project"
+          echo "has private_key: $has_key"
+          [ "$type" = "service_account" ] || { echo "FAIL: not a service account key"; exit 1; }
+          [ "$has_key" = "yes" ] || { echo "FAIL: private_key missing"; exit 1; }
+          if [ "$sa_project" != "$PROJECT_ID" ]; then echo "WARN: key project_id differs from FIREBASE_PROJECT_ID"; else echo "OK: project id matches"; fi
+      - name: Authenticate to Google
+        id: auth
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+          token_format: access_token
+      - name: Check Firebase Hosting access
+        env:
+          TOKEN: ${{ steps.auth.outputs.access_token }}
+          PROJECT_ID: ${{ vars.FIREBASE_PROJECT_ID }}
+        run: |
+          code=$(curl -sS -o /tmp/sites.json -w "%{http_code}" -H "Authorization: Bearer $TOKEN" "https://firebasehosting.googleapis.com/v1beta1/projects/${PROJECT_ID}/sites")
+          echo "Hosting API status: $code"
+          if [ "$code" = "200" ]; then
+            echo "OK: can read Hosting sites:"; jq -r '.sites[]? | .name + " -> " + (.defaultUrl // "")' /tmp/sites.json
+          else
+            echo "FAIL: response:"; jq -r '.error.message // .' /tmp/sites.json | head -5
+            exit 1
+          fi
