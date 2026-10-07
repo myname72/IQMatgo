@@ -24,12 +24,14 @@ export const START_OPEN = 4;
 
 export function createGame(difficulty, rng = Math.random, first = 'player') {
   const dealt = shuffle([...HWATU_CARDS, ...ITEM_CARDS], rng).map((card) => ({ card, taken: false }));
-  // 앞에서부터 일반 카드 4장이 깔릴 때까지 넘기고, 그 사이에 나온 아이템 패는 효과 없이 선(사람)이 먹는다
+  // 무작위 위치를 하나씩 넘기며 일반 카드 4장이 깔릴 때까지 진행하고, 그 사이에 나온 아이템 패는 효과 없이 선(사람)이 먹는다
   // (쌍피·쓰리피는 피로 계산)
   const startOpen = [];
   const startItems = [];
   const taken = new Set();
-  for (let i = 0; i < dealt.length && startOpen.length < START_OPEN; i++) {
+  const order = shuffle(dealt.map((_, k) => k), rng); // 판 위 무작위 위치에서 뽑는다
+  for (const i of order) {
+    if (startOpen.length >= START_OPEN) break;
     if (isItem(dealt[i].card)) {
       startItems.push(dealt[i].card);
       taken.add(i);
