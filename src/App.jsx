@@ -1,4 +1,4 @@
-import { useEffect, useReducer, useState } from 'react';
+import { useEffect, useLayoutEffect, useReducer, useRef, useState } from 'react';
 import { RotateCcw, Trophy, Hand } from 'lucide-react';
 import CardFace from './components/CardFace.jsx';
 import { ITEM_CARDS, ITEM_INFO } from './game/cards.js';
@@ -48,14 +48,14 @@ function CapturedRow({ groups, className }) {
   );
 }
 
-function CapturedPanel({ title, cards, score, goCount }) {
+function CapturedPanel({ who, title, cards, score, goCount }) {
   const pick = (kind) => cards.filter((c) => c.kind === kind);
   const pi = cards.filter((c) => c.piValue > 0); // 피, 쌍피, 아이템 쌍피·쓰리피
   const piCount = pi.reduce((sum, c) => sum + c.piValue, 0); // 쌍피는 2장
   const items = scoreItems(cards);
   const piItem = items.find((item) => item.key === 'pi');
   return (
-    <section className="captured" aria-label={`${title}이(가) 먹은 패`}>
+    <section className="captured" data-who={who} aria-label={`${title}이(가) 먹은 패`}>
       <header>
         <strong>{title}</strong>
         <span className={`pi-count ${piCount >= 10 ? 'enough' : ''}`} aria-label={`피 ${piCount}장`}>
@@ -73,6 +73,29 @@ function CapturedPanel({ title, cards, score, goCount }) {
         <CapturedRow groups={[pi]} className="row-pi" />
       </div>
     </section>
+  );
+}
+
+// 아이템 카드가 뒤집힌 칸에서 크게 커지며 빛나는 연출 (쌍피·쓰리피는 먹은 패 쪽으로 날아간다)
+function ItemPop({ event }) {
+  const ref = useRef(null);
+  const card = ITEM_CARDS.find((c) => c.item === event.item);
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el || !(event.item === 'ssangpi' || event.item === 'tripi')) return;
+    const panel = document.querySelector(`.captured[data-who="${event.who}"]`);
+    if (!panel) return;
+    const a = el.getBoundingClientRect();
+    const b = panel.getBoundingClientRect();
+    el.style.setProperty('--fly-x', `${Math.round(b.left + b.width / 2 - (a.left + a.width / 2))}px`);
+    el.style.setProperty('--fly-y', `${Math.round(b.top + b.height / 2 - (a.top + a.height / 2))}px`);
+  }, [event]);
+  return (
+    <div ref={ref} className={`item-pop item-pop-${event.item}`} aria-hidden="true">
+      <span className="item-pop-ring" />
+      <span className="item-pop-ring item-pop-ring2" />
+      <div className="item-pop-card"><CardFace card={card} /></div>
+    </div>
   );
 }
 
@@ -159,6 +182,8 @@ function Game({ state, send }) {
     if (state.phase === 'playing' && state.flipped.length === 2) {
       id = setTimeout(() => send({ type: 'RESOLVE' }), 900);
     } else if (state.phase === 'playing' && state.turn === 'ai') {
+      // 아이템 연출이 보이는 동안에는 기다렸다가, 끝나면(toastN 변경) 이어서 진행한다
+      if (state.itemEvent && toastN === state.itemEvent.n) return undefined;
       id = setTimeout(() => {
         const index = aiChooseFlip(state);
         if (index !== null) send({ type: 'FLIP', index });
@@ -170,7 +195,7 @@ function Game({ state, send }) {
       );
     }
     return () => clearTimeout(id);
-  }, [state, send]);
+  }, [state, send, toastN]);
 
   if (!state) {
     return <Menu onStart={(difficulty) => send({ type: 'START', difficulty })} />;
@@ -181,6 +206,7 @@ function Game({ state, send }) {
   // 다음에 틀리면 뒷면으로 돌아갈 카드 (가장 오래된 것부터)
   // 이번 턴이 끝나면 뒷면으로 돌아갈 카드 (남은 턴이 1)
   const dropping = new Set(state.revealed.filter((i) => state.revealLeft[i] === 1));
+  const popActive = Boolean(state.itemEvent && toastN === state.itemEvent.n);
   const canClick = state.phase === 'playing' && state.turn === 'player' && state.flipped.length < 2;
 
   if (state.phase === 'over') {
@@ -199,8 +225,8 @@ function Game({ state, send }) {
           </p>
         )}
 
-        <CapturedPanel title="AI" cards={state.captured.ai} score={aiScore} goCount={state.goCount.ai} />
-        <CapturedPanel title="플레이어" cards={state.captured.player} score={playerScore} goCount={state.goCount.player} />
+        <CapturedPanel who="ai" title="AI" cards={state.captured.ai} score={aiScore} goCount={state.goCount.ai} />
+        <CapturedPanel who="player" title="플레이어" cards={state.captured.player} score={playerScore} goCount={state.goCount.player} />
 
         {r.winner && (
           <section className="payout" aria-label="득점 내역">
@@ -250,12 +276,12 @@ function Game({ state, send }) {
 
       <div className="message-box" role="status" aria-live="polite">{state.message}</div>
 
-      <CapturedPanel title="AI" cards={state.captured.ai} score={aiScore} goCount={state.goCount.ai} />
+      <CapturedPanel who="ai" title="AI" cards={state.captured.ai} score={aiScore} goCount={state.goCount.ai} />
 
       {state.itemEvent && toastN === state.itemEvent.n && <ItemToast event={state.itemEvent} />}
 
       <div
-        className={`cards-grid ${state.itemEvent && toastN === state.itemEvent.n && state.itemEvent.item === 'shuffle' ? 'shuffling' : ''}`}
+        className={`cards-grid ${popActive && state.itemEvent.item === 'shuffle' ? 'shuffling' : ''} ${popActive && state.itemEvent.item === 'reset' ? 'resetting' : ''}`}
         aria-label="카드 판"
       >
         {state.deck.map((slot, index) => {
@@ -269,7 +295,7 @@ function Game({ state, send }) {
               {slot.taken ? null : up ? (
                 <button
                   type="button"
-                  className={`slot-face ${selected ? 'selected' : ''} ${dropping.has(index) ? 'dropping' : ''}`}
+                  className={`slot-face ${selected ? 'selected' : ''} ${dropping.has(index) ? 'dropping' : ''} ${popActive && state.itemEvent.picks.includes(index) ? 'peeked' : ''}`}
                   style={{ transform: `translate(${dx}px, ${dy}px) rotate(${rot}deg) scale(var(--reveal-scale, 1.25))` }}
                   onClick={() => send({ type: 'FLIP', index })}
                   disabled={!canClick || selected}
@@ -290,12 +316,13 @@ function Game({ state, send }) {
                   <span className="card-pattern" />
                 </button>
               )}
+              {popActive && state.itemEvent.index === index && <ItemPop event={state.itemEvent} />}
             </div>
           );
         })}
       </div>
 
-      <CapturedPanel title="플레이어" cards={state.captured.player} score={playerScore} goCount={state.goCount.player} />
+      <CapturedPanel who="player" title="플레이어" cards={state.captured.player} score={playerScore} goCount={state.goCount.player} />
 
       {state.phase === 'gostop' && state.turn === 'player' && (
         <div className="gostop-overlay" role="dialog" aria-label="고 또는 스톱">

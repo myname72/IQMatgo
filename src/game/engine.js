@@ -99,7 +99,7 @@ function useItem(state, index) {
     ...state,
     deck: state.deck.map((d, i) => (i === index ? { ...d, taken: true } : d)),
     rngCount: state.rngCount + 1,
-    itemEvent: { n: (state.itemEvent?.n ?? 0) + 1, who, item: card.item },
+    itemEvent: { n: (state.itemEvent?.n ?? 0) + 1, who, item: card.item, index, picks: [] }, // index: 아이템 카드가 있던 칸
   };
   const info = ITEM_INFO[card.item];
   next.message = `${whoLabel(who)}이(가) ${info.title} 카드를 뒤집었습니다! ${info.desc}`;
@@ -126,6 +126,7 @@ function useItem(state, index) {
       const picks = shuffle(candidates, rng).slice(0, 2);
       return {
         ...next,
+        itemEvent: { ...next.itemEvent, picks },
         revealed: [...next.revealed, ...picks],
         revealLeft: { ...next.revealLeft, ...Object.fromEntries(picks.map((i) => [i, PEEK_TURNS])) },
       };

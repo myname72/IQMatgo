@@ -256,7 +256,7 @@ describe('아이템 패', () => {
     expect(g.tries).toBe(0);
     expect(g.turn).toBe('player');
     expect(g.flipped).toEqual([a]); // 선택해 둔 카드는 그대로
-    expect(g.itemEvent).toMatchObject({ who: 'player', item: 'ssangpi' });
+    expect(g.itemEvent).toMatchObject({ who: 'player', item: 'ssangpi', index: i });
     expect(calculateScore(g.captured.player)).toBe(0);
   });
 
@@ -314,6 +314,7 @@ describe('아이템 패', () => {
       expect(g.deck[k].taken).toBe(false);
       expect(g.revealLeft[k]).toBe(PEEK_TURNS);
     }
+    expect([...g.itemEvent.picks].sort()).toEqual([...g.revealed].sort());
   });
 
   it('같은 상태에서 같은 아이템을 쓰면 결과도 같다 (리듀서가 순수하다)', () => {

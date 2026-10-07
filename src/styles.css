@@ -134,3 +134,59 @@ body {
 .cards-grid.shuffling .back-card { animation: jiggle 0.5s ease-in-out 2; }
 @keyframes jiggle { 0%, 100% { translate: 0 0; } 25% { translate: -3px 2px; } 75% { translate: 3px -2px; } }
 @media (prefers-reduced-motion: reduce) { .cards-grid.shuffling .back-card, .item-toast { animation: none; } }
+
+/* ---- 아이템 효과 연출 ---- */
+html, body { overflow-x: clip; }
+.cards-grid { position: relative; --pop-scale: 3; }
+@media (min-width: 700px) { .cards-grid { --pop-scale: 2.3; } }
+.item-pop { position: absolute; inset: 0; z-index: 40; pointer-events: none; }
+.item-pop-card {
+  position: absolute; inset: 0; transform-origin: center;
+  filter: drop-shadow(0 0 10px #ffd84d) drop-shadow(0 8px 16px rgba(0,0,0,0.65));
+  animation: item-pop-card 1.9s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+}
+.item-pop-card .card-img { border-radius: 6px; }
+@keyframes item-pop-card {
+  0% { transform: perspective(260px) rotateY(90deg) scale(0.5); opacity: 0; }
+  14% { transform: perspective(260px) rotateY(0deg) scale(calc(var(--pop-scale) * 1.18)); opacity: 1; }
+  24% { transform: scale(var(--pop-scale)); }
+  70% { transform: scale(var(--pop-scale)); opacity: 1; }
+  100% { transform: translate(var(--fly-x, 0px), var(--fly-y, 0px)) scale(0.4); opacity: 0; }
+}
+.item-pop-ring {
+  position: absolute; left: 50%; top: 50%; width: 140%; aspect-ratio: 1; border-radius: 50%;
+  border: 3px solid #ffd84d; opacity: 0; transform: translate(-50%, -50%) scale(0.3);
+  animation: item-ring 1.1s ease-out 0.12s forwards;
+}
+.item-pop-ring2 { border-color: #fff; animation-delay: 0.38s; }
+@keyframes item-ring {
+  0% { opacity: 0.95; transform: translate(-50%, -50%) scale(0.3); }
+  100% { opacity: 0; transform: translate(-50%, -50%) scale(8); }
+}
+/* 섞기: 남은 카드가 크게 흔들린다 */
+.cards-grid.shuffling .back-card, .cards-grid.shuffling .slot-face { animation: item-shake 0.42s ease-in-out 4; }
+@keyframes item-shake {
+  0%, 100% { translate: 0 0; rotate: 0deg; }
+  20% { translate: -5px 3px; rotate: -6deg; }
+  45% { translate: 5px -4px; rotate: 6deg; }
+  70% { translate: -4px -3px; rotate: -4deg; }
+}
+/* 초기화: 판 위로 빛줄기가 훑고 지나간다 */
+.cards-grid.resetting::after {
+  content: ''; position: absolute; inset: 0; border-radius: 12px; pointer-events: none; z-index: 35;
+  background: linear-gradient(100deg, transparent 35%, rgba(255,255,255,0.7) 50%, transparent 65%);
+  background-size: 300% 100%; animation: item-sweep 1.1s ease-out;
+}
+@keyframes item-sweep { from { background-position: 100% 0; opacity: 1; } to { background-position: 0 0; opacity: 0; } }
+/* 엿보기: 공개된 두 장이 금빛으로 맥동한다 */
+.slot-face.peeked { animation: item-peek 0.7s ease-in-out 3; z-index: 6; }
+@keyframes item-peek {
+  0%, 100% { filter: drop-shadow(0 0 0 rgba(255,216,77,0)); }
+  50% { filter: drop-shadow(0 0 9px #ffd84d) brightness(1.15); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .item-pop-ring { display: none; }
+  .item-pop-card { animation: none; transform: scale(var(--pop-scale)); }
+  .cards-grid.shuffling .back-card, .cards-grid.shuffling .slot-face, .slot-face.peeked { animation: none; }
+  .cards-grid.resetting::after { animation: none; display: none; }
+}
