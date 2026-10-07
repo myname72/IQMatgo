@@ -39,13 +39,16 @@ export function createGame(difficulty, rng = Math.random) {
     goCount: { player: 0, ai: 0 },
     lastGoScore: { player: 0, ai: 0 },
     pendingTurnEnd: null,
-    sweepEvent: null,
+    rewardEvent: null,
+    bonus: { player: 0, ai: 0 },
+    combo: { player: 0, ai: 0 },
     message: '당신의 턴입니다. 카드 2장을 뒤집으세요!',
     result: null,
   };
 }
 
-export const scoreOf = (state, who) => calculateScore(state.captured[who]);
+export const scoreOf = (state, who) => calculateScore(state.captured[who]) + (state.bonus?.[who] ?? 0);
+const COMBO_EVERY = 3; // 연속으로 이만큼 짝을 맞출 때마다 보너스
 
 const whoLabel = (who) => (who === 'player' ? '당신' : 'AI');
 
@@ -180,6 +183,7 @@ function finish(state, winner, how) {
     state.captured[winner],
     state.captured[other(winner)],
     state.goCount[winner],
+    state.bonus?.[winner] ?? 0,
   );
   return {
     ...state,
@@ -224,7 +228,7 @@ export function resolveFlip(state) {
       }
     }
     const lastHidden = [...new Set([...hidden, ...(turns ? [] : [i, j])])];
-    return finishTurn({ ...state, flipped: [], revealed, revealLeft, lastHidden }, who, 'miss');
+    return finishTurn({ ...state, flipped: [], revealed, revealLeft, lastHidden, combo: { ...state.combo, [who]: 0 } }, who, 'miss');
   }
 
   const deck = state.deck.map((s, k) => (k === i || k === j ? { ...s, taken: true } : s));
@@ -243,10 +247,19 @@ export function resolveFlip(state) {
 
   if (remainingNormal(next) === 0) return settleEnd(next);
 
-  // 판쓸: 판에 열려 있던 카드를 이번 짝으로 모두 먹으면 상대의 피 한 장을 가져온다
-  if (state.revealed.length > 0 && next.revealed.length === 0) {
-    const sweep = sweepPi(next, who);
-    Object.assign(next, sweep.state, { message: `🧹 판쓸! ${whoLabel(who)}이(가) ${a.month}월 짝으로 열린 카드를 모두 먹었습니다.${sweep.stolen ? ' 상대의 피 한 장을 가져옵니다!' : ''}` });
+  // 보너스: 판쓸·쪽·따닥·폭탄·콤보는 상대의 피를 가져온다 (판쓸은 +1점도 더한다)
+  const rewards = [];
+  next.combo = { ...state.combo, [who]: state.combo[who] + 1 };
+  if (state.revealed.length > 0 && next.revealed.length === 0) rewards.push({ kind: 'sweep', label: '판쓸', pi: 1, bonus: 1 });
+  if (state.tries === 0 && !state.revealed.includes(i) && !state.revealed.includes(j)) rewards.push({ kind: 'jjok', label: '쪽', pi: 1 });
+  if (state.tries === 1) rewards.push({ kind: 'ddadak', label: '따닥', pi: 1 });
+  if (state.revealed.filter((k) => state.deck[k].card.month === a.month).length >= 3) rewards.push({ kind: 'bomb', label: '폭탄', pi: 2 });
+  if (next.combo[who] % COMBO_EVERY === 0) rewards.push({ kind: 'combo', label: `${next.combo[who]}콤보`, pi: 1 });
+  if (rewards.length) {
+    const r = applyRewards(next, who, rewards);
+    Object.assign(next, r.state, {
+      message: `✨ ${rewards.map((x) => x.label).join('·')}! ${whoLabel(who)}이(가) ${r.stolen.length ? `상대의 피 ${r.stolen.length}장을 가져옵니다` : '보너스를 얻었습니다'}${r.bonus ? ` (+${r.bonus}점)` : ''}.`,
+    });
   }
 
   // 아직 시도 기회가 남아 있으면 고/스톱은 묻지 않고 턴을 마저 한다
@@ -254,21 +267,24 @@ export function resolveFlip(state) {
   return finishTurn(next, who, 'tries');
 }
 
-// 판쓸 보상: 상대의 피 중 가치가 가장 낮은 한 장(일반 피 → 쌍피 → 쓰리피 순)을 가져온다
-function sweepPi(state, who) {
+// 보상 처리: 상대의 피 중 가치가 낮은 것부터(일반 피 → 쌍피 → 쓰리피) 가져온다
+function applyRewards(state, who, rewards) {
   const foe = other(who);
-  const cand = state.captured[foe].filter((c) => c.piValue > 0).sort((x, y) => x.piValue - y.piValue);
-  const stolen = cand[0] ?? null;
-  const sweepEvent = { n: (state.sweepEvent?.n ?? 0) + 1, who, stolen: stolen ? { ...stolen } : null };
-  if (!stolen) return { state: { sweepEvent }, stolen };
+  const want = rewards.reduce((n, r) => n + (r.pi ?? 0), 0);
+  const bonus = rewards.reduce((n, r) => n + (r.bonus ?? 0), 0);
+  const pool = state.captured[foe].filter((c) => c.piValue > 0).sort((x, y) => x.piValue - y.piValue);
+  const stolen = pool.slice(0, want);
+  const rewardEvent = { n: (state.rewardEvent?.n ?? 0) + 1, who, rewards, stolen: stolen.map((c) => ({ ...c })), bonus };
   return {
     stolen,
+    bonus,
     state: {
-      sweepEvent,
+      rewardEvent,
+      bonus: { ...state.bonus, [who]: state.bonus[who] + bonus },
       captured: {
         ...state.captured,
-        [foe]: state.captured[foe].filter((c) => c !== stolen),
-        [who]: [...state.captured[who], stolen],
+        [foe]: state.captured[foe].filter((c) => !stolen.includes(c)),
+        [who]: [...state.captured[who], ...stolen],
       },
     },
   };

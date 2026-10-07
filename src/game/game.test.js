@@ -439,25 +439,70 @@ describe('아이템 패', () => {
     expect(h.turnEvent).toMatchObject({ to: 'ai', reason: 'go' });
   });
 
-  it('판쓸: 열려 있던 카드를 짝으로 모두 먹으면 상대 피 한 장을 가져온다', () => {
+  const pairOf = (g, m) => g.deck.map((s, k) => (!s.taken && s.card.month === m ? k : -1)).filter((k) => k >= 0).slice(0, 2);
+
+  it('판쓸: 열려 있던 카드를 모두 먹으면 상대 피 한 장과 +1점', () => {
     let g = createGame('easy');
-    const ms = g.deck.map((s, k) => (s.card.month === 1 ? k : -1)).filter((k) => k >= 0).slice(0, 2);
+    const ms = pairOf(g, 1);
     g.revealed = [...ms];
     g.revealLeft = { [ms[0]]: 3, [ms[1]]: 3 };
     g.captured.ai = fill('pi', 3);
+    g.tries = 1; // 따닥과 구분
     g = resolveFlip(flipCard(flipCard(g, ms[0]), ms[1]));
-    expect(g.sweepEvent).toMatchObject({ who: 'player' });
-    expect(g.captured.ai).toHaveLength(2);
-    expect(g.captured.player.length).toBe(3);
+    expect(g.rewardEvent.rewards.map((r) => r.kind)).toContain('sweep');
+    expect(g.captured.ai).toHaveLength(3 - g.rewardEvent.stolen.length);
+    expect(g.bonus.player).toBe(1);
     // 열린 카드가 남아 있으면 판쓸이 아니다
     let h = createGame('easy');
-    const m2 = h.deck.map((s, k) => (s.card.month === 1 ? k : -1)).filter((k) => k >= 0).slice(0, 2);
+    const m2 = pairOf(h, 1);
     const other = h.deck.findIndex((s) => s.card.month === 5);
     h.revealed = [...m2, other];
     h.revealLeft = { [m2[0]]: 3, [m2[1]]: 3, [other]: 3 };
-    h.captured.ai = fill('pi', 3);
+    h.tries = 1;
     h = resolveFlip(flipCard(flipCard(h, m2[0]), m2[1]));
-    expect(h.sweepEvent).toBeNull();
-    expect(h.captured.ai).toHaveLength(3);
+    expect(h.bonus.player).toBe(0);
+  });
+
+  it('쪽: 첫 시도에서 처음 보는 두 장이 짝이면 상대 피 한 장', () => {
+    let g = createGame('normal');
+    g.captured.ai = fill('pi', 3);
+    const [x, y] = pairOf(g, 4);
+    g = resolveFlip(flipCard(flipCard(g, x), y));
+    expect(g.rewardEvent.rewards.map((r) => r.kind)).toEqual(['jjok']);
+    expect(g.captured.ai).toHaveLength(2);
+  });
+
+  it('따닥: 한 턴에 두 번 연속 맞추면 상대 피 한 장', () => {
+    let g = createGame('normal');
+    g.captured.ai = fill('pi', 3);
+    g.tries = 1;
+    const [x, y] = pairOf(g, 4);
+    g = resolveFlip(flipCard(flipCard(g, x), y));
+    expect(g.rewardEvent.rewards.map((r) => r.kind)).toEqual(['ddadak']);
+  });
+
+  it('폭탄: 열린 같은 월 3장이 있을 때 맞추면 피 2장', () => {
+    let g = createGame('easy');
+    g.captured.ai = fill('pi', 4);
+    const cards = g.deck.map((s, k) => (s.card.month === 4 ? k : -1)).filter((k) => k >= 0);
+    g.revealed = cards.slice(0, 3);
+    g.revealLeft = Object.fromEntries(g.revealed.map((k) => [k, 3]));
+    g = resolveFlip(flipCard(flipCard(g, cards[0]), cards[1]));
+    expect(g.rewardEvent.rewards.map((r) => r.kind)).toContain('bomb');
+    expect(g.captured.ai).toHaveLength(2);
+  });
+
+  it('콤보: 3번 연속 맞추면 피 한 장, 틀리면 콤보가 끊긴다', () => {
+    let g = createGame('normal');
+    g.captured.ai = fill('pi', 5);
+    g.combo = { player: 2, ai: 0 };
+    const [x, y] = pairOf(g, 4);
+    g.tries = 0;
+    g = resolveFlip(flipCard(flipCard(g, x), y));
+    expect(g.rewardEvent.rewards.map((r) => r.kind)).toContain('combo');
+    const i = g.deck.findIndex((s) => !s.taken && s.card.month === 1);
+    const j = g.deck.findIndex((s) => !s.taken && s.card.month === 2);
+    g = resolveFlip(flipCard(flipCard(g, i), j));
+    expect(g.combo.player).toBe(0);
   });
 });
