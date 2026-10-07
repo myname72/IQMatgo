@@ -1,4 +1,4 @@
-import { HWATU_CARDS, shuffle } from './cards.js';
+import { HWATU_CARDS, ITEM_CARDS, ITEM_INFO, shuffle } from './cards.js';
 import { calculateScore, finalPayout, WIN_THRESHOLD } from './scoring.js';
 
 // AI가 기억하는 카드 수 (난이도)
@@ -14,6 +14,9 @@ export const MAX_FLIPS = 4;
 export const AUTO_STOP_REMAINING = 4;
 export const MAX_TRIES = MAX_FLIPS / 2;
 
+// 엿보기로 공개된 카드가 유지되는 턴 수
+export const PEEK_TURNS = 5;
+
 const other = (who) => (who === 'player' ? 'ai' : 'player');
 
 export function createGame(difficulty, rng = Math.random) {
@@ -21,7 +24,9 @@ export function createGame(difficulty, rng = Math.random) {
     phase: 'playing', // playing | gostop | over
     difficulty,
     seed: Math.floor(rng() * 2 ** 31), // 판 위 카드의 흐트러진 배치용 (게임 중 고정)
-    deck: shuffle(HWATU_CARDS, rng).map((card) => ({ card, taken: false })),
+    deck: shuffle([...HWATU_CARDS, ...ITEM_CARDS], rng).map((card) => ({ card, taken: false })),
+    rngCount: 0, // 아이템 효과용 난수 (seed로부터 결정적으로 만든다)
+    itemEvent: null, // 마지막으로 발동한 아이템 { n, who, item }
     flipped: [],
     turn: 'player',
     tries: 0, // 이번 턴에 사용한 시도 횟수
@@ -48,11 +53,94 @@ function remember(state, index) {
   return memory.slice(-limit);
 }
 
+const isItem = (card) => card.kind === 'item';
+const remainingNormal = (state) => state.deck.filter((d) => !d.taken && !isItem(d.card)).length;
+
+// 리듀서를 순수하게 유지하기 위해 seed와 사용 횟수로 결정적인 난수를 만든다
+function rngFor(state) {
+  let a = (state.seed + Math.imul(state.rngCount, 0x9e3779b9)) >>> 0;
+  return () => {
+    a = (a + 0x6d2b79f5) >>> 0;
+    let t = a;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+// 남은 카드(앞면으로 열린 것 포함)의 위치를 무작위로 바꾼다
+function shuffleBoard(state, rng) {
+  const positions = state.deck.map((d, i) => (d.taken ? -1 : i)).filter((i) => i >= 0);
+  const order = shuffle(positions, rng); // order[k] = positions[k] 자리로 옮겨 갈 카드의 옛 위치
+  const deck = [...state.deck];
+  const moved = {};
+  positions.forEach((pos, k) => {
+    deck[pos] = state.deck[order[k]];
+    moved[order[k]] = pos;
+  });
+  const to = (i) => moved[i] ?? i;
+  return {
+    ...state,
+    deck,
+    flipped: state.flipped.map(to),
+    revealed: state.revealed.map(to),
+    revealLeft: Object.fromEntries(Object.entries(state.revealLeft).map(([k, v]) => [to(+k), v])),
+    lastHidden: [],
+    memory: [], // 위치가 바뀌었으니 AI의 기억도 소용없다
+  };
+}
+
+// 아이템 패를 뒤집었을 때: 그 자리에서 효과가 발동하고, 시도 횟수는 쓰지 않는다.
+function useItem(state, index) {
+  const card = state.deck[index].card;
+  const who = state.turn;
+  const rng = rngFor(state);
+  let next = {
+    ...state,
+    deck: state.deck.map((d, i) => (i === index ? { ...d, taken: true } : d)),
+    rngCount: state.rngCount + 1,
+    itemEvent: { n: (state.itemEvent?.n ?? 0) + 1, who, item: card.item },
+  };
+  const info = ITEM_INFO[card.item];
+  next.message = `${whoLabel(who)}이(가) ${info.title} 카드를 뒤집었습니다! ${info.desc}`;
+
+  switch (card.item) {
+    case 'ssangpi':
+    case 'tripi':
+      next = { ...next, captured: { ...next.captured, [who]: [...next.captured[who], card] } };
+      return checkGoStop(next, who, false);
+    case 'shuffle':
+      return shuffleBoard(next, rng);
+    case 'reset':
+      return {
+        ...next,
+        lastHidden: [...state.revealed],
+        revealed: [],
+        revealLeft: {},
+        memory: [],
+      };
+    case 'peek': {
+      const candidates = next.deck
+        .map((d, i) => (d.taken || isItem(d.card) || next.revealed.includes(i) || next.flipped.includes(i) ? -1 : i))
+        .filter((i) => i >= 0);
+      const picks = shuffle(candidates, rng).slice(0, 2);
+      return {
+        ...next,
+        revealed: [...next.revealed, ...picks],
+        revealLeft: { ...next.revealLeft, ...Object.fromEntries(picks.map((i) => [i, PEEK_TURNS])) },
+      };
+    }
+    default:
+      return next;
+  }
+}
+
 export function flipCard(state, index) {
   const slot = state.deck[index];
   if (state.phase !== 'playing' || !slot || slot.taken) return state;
   // 앞면으로 남아 있는(revealed) 카드도 다시 선택할 수 있다
   if (state.flipped.length >= 2 || state.flipped.includes(index)) return state;
+  if (isItem(slot.card)) return useItem(state, index);
   return {
     ...state,
     flipped: [...state.flipped, index],
@@ -143,16 +231,20 @@ export function resolveFlip(state) {
   };
   next.message = `🎯 ${whoLabel(who)}이(가) ${a.month}월 짝을 맞췄습니다!`;
 
-  if (next.deck.every((s) => s.taken)) return settleEnd(next);
+  if (remainingNormal(next) === 0) return settleEnd(next);
 
+  return checkGoStop(next, who, true);
+}
+
+// 점수가 고/스톱 조건에 닿았는지 확인한다. 남은 카드가 적으면 묻지 않고 스톱한다.
+function checkGoStop(next, who, endTurn) {
   const score = scoreOf(next, who);
   const needed = Math.max(WIN_THRESHOLD, next.lastGoScore[who] + 1);
   if (score >= needed) {
-    const remaining = next.deck.filter((d) => !d.taken).length;
-    if (remaining <= AUTO_STOP_REMAINING) return finish(next, who, 'auto');
+    if (remainingNormal(next) <= AUTO_STOP_REMAINING) return finish(next, who, 'auto');
     return { ...next, phase: 'gostop', message: `${whoLabel(who)}이(가) ${score}점! 고 또는 스톱?` };
   }
-  return endTurnIfOutOfTries(next);
+  return endTurn ? endTurnIfOutOfTries(next) : next;
 }
 
 // 턴이 넘어갈 때: 열려 있는 카드의 남은 턴을 하나씩 줄이고 0이 되면 뒷면으로 돌린다
@@ -243,7 +335,7 @@ export function aiChooseFlip(state, rng = Math.random) {
   if (state.flipped.length === 0) {
     // 기억 속에 짝이 있으면 우선 선택
     for (const i of known) {
-      if (known.some((j) => j !== i && monthOf(j) === monthOf(i))) return i;
+      if (monthOf(i) !== 0 && known.some((j) => j !== i && monthOf(j) === monthOf(i))) return i;
     }
   } else {
     const first = state.flipped[0];

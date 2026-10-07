@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
-import { HWATU_CARDS } from './cards.js';
+import { HWATU_CARDS, ITEM_CARDS } from './cards.js';
 import { calculateScore, scoreItems, applyGo, finalPayout } from './scoring.js';
-import { REVEAL_TURNS, AUTO_STOP_REMAINING, MAX_TRIES, createGame, flipCard, resolveFlip, declareGo, declareStop, aiChooseFlip, scoreOf } from './engine.js';
+import { PEEK_TURNS, REVEAL_TURNS, AUTO_STOP_REMAINING, MAX_TRIES, createGame, flipCard, resolveFlip, declareGo, declareStop, aiChooseFlip, scoreOf } from './engine.js';
 
 const byName = (...names) => names.map((n) => HWATU_CARDS.find((c) => c.name === n));
 const fill = (kind, n) => HWATU_CARDS.filter((c) => c.kind === kind).slice(0, n);
@@ -232,5 +232,104 @@ describe('게임 진행', () => {
     g = resolveFlip(flipCard(flipCard(g, a), b));
     expect(g.deck.filter((s) => !s.taken)).toHaveLength(6);
     expect(g.phase).toBe('gostop');
+  });
+});
+
+describe('아이템 패', () => {
+  const idxOfItem = (g, item) => g.deck.findIndex((s) => s.card.item === item);
+  const idxOfMonth = (g, m, n = 0) => g.deck.map((s, i) => (s.card.month === m ? i : -1)).filter((i) => i >= 0)[n];
+
+  it('덱은 일반 48장 + 아이템 6장이다', () => {
+    const g = createGame('normal');
+    expect(g.deck).toHaveLength(54);
+    expect(ITEM_CARDS.map((c) => c.item).sort()).toEqual(['peek', 'reset', 'shuffle', 'ssangpi', 'ssangpi', 'tripi']);
+  });
+
+  it('쌍피: 먹은 패에 피 2장으로 들어가고 시도 횟수·차례는 그대로다', () => {
+    let g = createGame('normal');
+    const a = idxOfMonth(g, 1);
+    g = flipCard(g, a); // 먼저 일반 카드 한 장 선택
+    const i = idxOfItem(g, 'ssangpi');
+    g = flipCard(g, i);
+    expect(g.deck[i].taken).toBe(true);
+    expect(g.captured.player.map((c) => c.piValue)).toEqual([2]);
+    expect(g.tries).toBe(0);
+    expect(g.turn).toBe('player');
+    expect(g.flipped).toEqual([a]); // 선택해 둔 카드는 그대로
+    expect(g.itemEvent).toMatchObject({ who: 'player', item: 'ssangpi' });
+    expect(calculateScore(g.captured.player)).toBe(0);
+  });
+
+  it('쓰리피는 피 3장으로 계산된다', () => {
+    let g = createGame('normal');
+    g = flipCard(g, idxOfItem(g, 'tripi'));
+    expect(g.captured.player[0].piValue).toBe(3);
+  });
+
+  it('쌍피를 먹어 7점이 되면 고/스톱을 묻는다', () => {
+    let g = createGame('normal');
+    g.captured.player = fill('gwang', 5);
+    g = flipCard(g, idxOfItem(g, 'ssangpi'));
+    expect(g.phase).toBe('gostop');
+  });
+
+  it('섞기: 남은 카드의 위치가 바뀌고 선택·공개 카드는 따라간다', () => {
+    let g = createGame('easy');
+    const a = idxOfMonth(g, 1);
+    const b = idxOfMonth(g, 2);
+    g = { ...g, revealed: [b], revealLeft: { [b]: 3 }, memory: [a, b] };
+    g = flipCard(g, a);
+    const cardA = g.deck[a].card;
+    const cardB = g.deck[b].card;
+    g = flipCard(g, idxOfItem(g, 'shuffle'));
+    expect(g.deck[g.flipped[0]].card).toBe(cardA);
+    expect(g.deck[g.revealed[0]].card).toBe(cardB);
+    expect(g.revealLeft[g.revealed[0]]).toBe(3);
+    expect(g.memory).toEqual([]);
+    const ids = g.deck.filter((s) => !s.taken).map((s) => s.card.id).sort((x, y) => x - y);
+    expect(ids).toHaveLength(53);
+    expect(new Set(ids).size).toBe(53);
+  });
+
+  it('초기화: 열려 있던 카드를 모두 뒷면으로 돌린다 (고른 카드는 유지)', () => {
+    let g = createGame('easy');
+    const a = idxOfMonth(g, 1);
+    const b = idxOfMonth(g, 2);
+    const c = idxOfMonth(g, 3);
+    g = { ...g, revealed: [b, c], revealLeft: { [b]: 4, [c]: 2 } };
+    g = flipCard(g, a);
+    g = flipCard(g, idxOfItem(g, 'reset'));
+    expect(g.revealed).toEqual([]);
+    expect(g.revealLeft).toEqual({});
+    expect(g.lastHidden.sort()).toEqual([b, c].sort());
+    expect(g.flipped).toEqual([a]);
+  });
+
+  it('엿보기: 뒷면 일반 카드 2장이 5턴 동안 공개된다', () => {
+    let g = createGame('normal');
+    g = flipCard(g, idxOfItem(g, 'peek'));
+    expect(g.revealed).toHaveLength(2);
+    for (const k of g.revealed) {
+      expect(g.deck[k].card.kind).not.toBe('item');
+      expect(g.deck[k].taken).toBe(false);
+      expect(g.revealLeft[k]).toBe(PEEK_TURNS);
+    }
+  });
+
+  it('같은 상태에서 같은 아이템을 쓰면 결과도 같다 (리듀서가 순수하다)', () => {
+    const g = createGame('normal');
+    const i = idxOfItem(g, 'shuffle');
+    const x = flipCard(g, i);
+    const y = flipCard(g, i);
+    expect(x.deck.map((s) => s.card.id)).toEqual(y.deck.map((s) => s.card.id));
+  });
+
+  it('게임은 일반 카드를 모두 가져가면 끝난다 (아이템이 남아 있어도)', () => {
+    let g = createGame('normal');
+    const pair = [idxOfMonth(g, 1), idxOfMonth(g, 1, 1)];
+    g.deck = g.deck.map((s, i) => (pair.includes(i) || s.card.kind === 'item' ? s : { ...s, taken: true }));
+    g = resolveFlip(flipCard(flipCard(g, pair[0]), pair[1]));
+    expect(g.phase).toBe('over');
+    expect(g.deck.some((s) => !s.taken && s.card.kind === 'item')).toBe(true);
   });
 });

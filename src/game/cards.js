@@ -82,7 +82,27 @@ export const HWATU_CARDS = SPEC.map(([month, kind, ribbon, name], i) => {
   };
 });
 
+// 아이템 패 6장: 뒤집으면 그 자리에서 효과가 발동하고, 시도 횟수는 쓰지 않는다.
+// 쌍피·쓰리피는 먹은 패의 피로 들어가고, 나머지는 효과 후 사라진다.
+export const ITEM_CARDS = [
+  { id: 49, month: 0, kind: 'item', item: 'ssangpi', name: '쌍피', piValue: 2 },
+  { id: 50, month: 0, kind: 'item', item: 'ssangpi', name: '쌍피', piValue: 2 },
+  { id: 51, month: 0, kind: 'item', item: 'tripi', name: '쓰리피', piValue: 3 },
+  { id: 52, month: 0, kind: 'item', item: 'shuffle', name: '섞기', piValue: 0 },
+  { id: 53, month: 0, kind: 'item', item: 'reset', name: '초기화', piValue: 0 },
+  { id: 54, month: 0, kind: 'item', item: 'peek', name: '엿보기', piValue: 0 },
+];
+
+export const ITEM_INFO = {
+  ssangpi: { title: '쌍피', desc: '피 2장으로 계산되는 피를 얻습니다' },
+  tripi: { title: '쓰리피', desc: '피 3장으로 계산되는 피를 얻습니다' },
+  shuffle: { title: '섞기', desc: '남은 카드의 위치가 모두 바뀝니다' },
+  reset: { title: '초기화', desc: '열려 있던 카드가 모두 뒷면으로 돌아갑니다' },
+  peek: { title: '엿보기', desc: '카드 2장이 5턴 동안 공개됩니다' },
+};
+
 export const KIND_LABEL = {
+  item: '아이템',
   gwang: '광',
   animal: '열끗',
   ribbon: '띠',

@@ -1,6 +1,7 @@
-import { useEffect, useReducer } from 'react';
+import { useEffect, useReducer, useState } from 'react';
 import { RotateCcw, Trophy, Hand } from 'lucide-react';
 import CardFace from './components/CardFace.jsx';
+import { ITEM_CARDS, ITEM_INFO } from './game/cards.js';
 import { WIN_THRESHOLD, scoreItems } from './game/scoring.js';
 import {
   gameReducer,
@@ -49,7 +50,7 @@ function CapturedRow({ groups, className }) {
 
 function CapturedPanel({ title, cards, score, goCount }) {
   const pick = (kind) => cards.filter((c) => c.kind === kind);
-  const pi = cards.filter((c) => c.kind === 'pi' || c.kind === 'ssangpi');
+  const pi = cards.filter((c) => c.piValue > 0); // 피, 쌍피, 아이템 쌍피·쓰리피
   const piCount = pi.reduce((sum, c) => sum + c.piValue, 0); // 쌍피는 2장
   const items = scoreItems(cards);
   const piItem = items.find((item) => item.key === 'pi');
@@ -75,6 +76,21 @@ function CapturedPanel({ title, cards, score, goCount }) {
   );
 }
 
+function ItemToast({ event }) {
+  const card = ITEM_CARDS.find((c) => c.item === event.item);
+  const info = ITEM_INFO[event.item];
+  return (
+    <div className="item-toast" role="status" aria-live="polite">
+      <div className="item-toast-card"><CardFace card={card} /></div>
+      <div>
+        <strong>{event.who === 'player' ? '내가' : 'AI가'} {info.title}!</strong>
+        <p>{info.desc}</p>
+        <p className="item-toast-note">시도 횟수는 쓰지 않습니다</p>
+      </div>
+    </div>
+  );
+}
+
 function Menu({ onStart }) {
   return (
     <div className="screen menu-screen">
@@ -92,6 +108,7 @@ function Menu({ onStart }) {
         <h3>게임 규칙</h3>
         <p>• 화투 48장 중 같은 월 2장을 뒤집어 맞추면 가져가고 한 번 더 뒤집을 수 있습니다. 틀리거나, 한 턴에 카드 4장(2번 시도)을 모두 열면 맞췄어도 상대 차례입니다.</p>
         <p>• 쉬움 난이도에서는 틀린 카드가 5턴(사람과 AI의 턴을 모두 셉니다) 동안 앞면으로 남아 있고, 앞면인 카드도 다시 골라 짝을 맞출 수 있습니다. 카드 모서리의 숫자는 남은 턴이고, 점선 테두리 카드는 이번 턴이 끝나면 뒷면으로 돌아갑니다.</p>
+        <p>• 판에는 <b>아이템 패 6장</b>(쌍피 2, 쓰리피, 섞기, 초기화, 엿보기)이 섞여 있습니다. 뒤집으면 그 자리에서 효과가 발동하고 시도 횟수는 쓰지 않습니다. 쌍피·쓰리피는 피 2장·3장으로 계산되어 먹은 패에 들어가고, 섞기는 남은 카드의 위치를 모두 바꾸며, 초기화는 열려 있던 카드를 모두 뒷면으로 돌리고, 엿보기는 카드 2장을 5턴 동안 공개합니다.</p>
         <p>• 광 3점(비광 포함 2점)·4광 4점·5광 15점, 고도리 5점, 홍단·청단·초단 각 3점</p>
         <p>• 열끗·띠는 5장부터 1점(이후 1장당 +1), 피는 10장부터 1점(쌍피는 2장으로 계산)</p>
         <p>• {WIN_THRESHOLD}점 이상이 되면 <b>고</b>(계속) 또는 <b>스톱</b>(종료)을 선택합니다. 고를 부른 뒤에는 점수가 더 올라야 다시 선택할 수 있습니다.</p>
@@ -120,6 +137,19 @@ export default function App() {
 }
 
 function Game({ state, send }) {
+  // 아이템 효과 알림: 새 아이템이 발동할 때마다 잠깐 보여 준다
+  const itemN = state?.itemEvent?.n ?? 0;
+  const [toastN, setToastN] = useState(0);
+  useEffect(() => {
+    if (!itemN) {
+      setToastN(0);
+      return undefined;
+    }
+    setToastN(itemN);
+    const id = setTimeout(() => setToastN(0), 2600);
+    return () => clearTimeout(id);
+  }, [itemN]);
+
   useEffect(() => {
     if (!state || state.phase === 'over') return undefined;
     let id;
@@ -219,7 +249,12 @@ function Game({ state, send }) {
 
       <CapturedPanel title="AI" cards={state.captured.ai} score={aiScore} goCount={state.goCount.ai} />
 
-      <div className="cards-grid" aria-label="카드 판">
+      {state.itemEvent && toastN === state.itemEvent.n && <ItemToast event={state.itemEvent} />}
+
+      <div
+        className={`cards-grid ${state.itemEvent && toastN === state.itemEvent.n && state.itemEvent.item === 'shuffle' ? 'shuffling' : ''}`}
+        aria-label="카드 판"
+      >
         {state.deck.map((slot, index) => {
           const selected = state.flipped.includes(index);
           const up = selected || state.revealed.includes(index);

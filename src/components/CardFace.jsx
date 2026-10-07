@@ -1,7 +1,9 @@
 import { KIND_LABEL, MONTHS, ribbonLabel } from '../game/cards.js';
 import { CARD_IMAGES } from '../game/images.js';
+import ItemFace from './ItemFace.jsx';
 
 export default function CardFace({ card }) {
+  if (card.kind === 'item') return <ItemFace card={card} />;
   const label = `${card.month}월 ${card.name} (${KIND_LABEL[card.kind]}${card.ribbon ? ' · ' + ribbonLabel(card.ribbon) : ''})`;
   const src = CARD_IMAGES[card.imageKey];
   if (!src) {
