@@ -1,10 +1,13 @@
 import { describe, it, expect } from 'vitest';
 import { HWATU_CARDS, ITEM_CARDS } from './cards.js';
 import { calculateScore, scoreItems, applyGo, finalPayout } from './scoring.js';
-import { PEEK_VIEW_MS, MEMORY_LIMIT, REVEAL_TURNS, AUTO_STOP_REMAINING, MAX_TRIES, createGame, flipCard, resolveFlip, declareGo, declareStop, aiChooseFlip, scoreOf } from './engine.js';
+import { PEEK_VIEW_MS, START_OPEN, MEMORY_LIMIT, REVEAL_TURNS, AUTO_STOP_REMAINING, MAX_TRIES, createGame, flipCard, resolveFlip, declareGo, declareStop, aiChooseFlip, scoreOf } from './engine.js';
 
 const byName = (...names) => names.map((n) => HWATU_CARDS.find((c) => c.name === n));
 const fill = (kind, n) => HWATU_CARDS.filter((c) => c.kind === kind).slice(0, n);
+
+// 시작할 때 깔리는 카드를 치우고 시작하는 테스트용 판
+const cleanGame = (d) => ({ ...createGame(d), revealed: [], revealLeft: {}, memory: [] });
 
 describe('카드 구성', () => {
   it('48장, 월별 4장, 종류별 개수가 실제 화투와 같다', () => {
@@ -138,8 +141,20 @@ describe('게임 진행', () => {
     expect(g.turn).toBe('ai');
     expect(g.tries).toBe(0);
   });
+  it('시작할 때 일반 카드 4장이 앞면으로 깔리고 양쪽이 한 턴씩 볼 수 있다', () => {
+    for (const d of ['easy', 'normal', 'hard']) {
+      let g = createGame(d);
+      expect(g.revealed).toHaveLength(START_OPEN);
+      expect(g.revealed.every((k) => g.deck[k].card.kind !== 'item')).toBe(true);
+      const open = [...g.revealed];
+      const a = g.deck.findIndex((s, k) => !open.includes(k) && s.card.kind !== 'item');
+      const b = g.deck.findIndex((s, k) => !open.includes(k) && k !== a && s.card.kind !== 'item' && s.card.month !== g.deck[a].card.month);
+      g = resolveFlip(flipCard(flipCard(g, a), b)); // 내 턴이 끝남
+      expect(open.every((k) => g.revealed.includes(k) || g.deck[k].taken)).toBe(true);
+    }
+  });
   it('쉬움: 틀린 카드는 5턴 동안 앞면으로 유지되고 6번째 턴 시작 전에 뒷면으로 돌아간다', () => {
-    let g = createGame('easy');
+    let g = cleanGame('easy');
     expect(REVEAL_TURNS.easy).toBe(5);
     const firsts = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map((m) => g.deck.findIndex((s) => s.card.month === m));
     const miss = (a, b) => { g = resolveFlip(flipCard(flipCard(g, a), b)); };
@@ -185,7 +200,7 @@ describe('게임 진행', () => {
     expect(g.revealed).not.toContain(a2);
   });
   it('보통/어려움은 틀린 카드를 유지하지 않는다', () => {
-    let g = createGame('normal');
+    let g = cleanGame('normal');
     const i = g.deck.findIndex((s) => s.card.month === 1);
     const j = g.deck.findIndex((s) => s.card.month === 2);
     g = resolveFlip(flipCard(flipCard(g, i), j));
@@ -350,7 +365,7 @@ describe('아이템 패', () => {
 
   it('엿보기(AI): 기억력 한도 안에서 짝이 되는 카드를 기억한다', () => {
     for (const diff of ['easy', 'normal', 'hard']) {
-      let g = { ...createGame(diff), turn: 'ai' };
+      let g = { ...cleanGame(diff), turn: 'ai' };
       g = flipCard(g, idxOfItem(g, 'peek'));
       expect(g.itemEvent).toMatchObject({ who: 'ai', item: 'peek' });
       expect(g.memory.length).toBeGreaterThan(0);
@@ -463,7 +478,7 @@ describe('아이템 패', () => {
   });
 
   it('쪽: 첫 시도에서 처음 보는 두 장이 짝이면 상대 피 한 장', () => {
-    let g = createGame('normal');
+    let g = cleanGame('normal');
     g.captured.ai = fill('pi', 3);
     const [x, y] = pairOf(g, 4);
     g = resolveFlip(flipCard(flipCard(g, x), y));

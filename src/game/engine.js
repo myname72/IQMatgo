@@ -19,12 +19,18 @@ export const PEEK_VIEW_MS = 3000;
 
 const other = (who) => (who === 'player' ? 'ai' : 'player');
 
+// 시작할 때 판에 앞면으로 깔아 두는 카드 수 (먼저 시작하는 쪽이 불리하지 않도록 둘 다 본다)
+export const START_OPEN = 4;
+
 export function createGame(difficulty, rng = Math.random) {
+  const deck = shuffle([...HWATU_CARDS, ...ITEM_CARDS], rng).map((card) => ({ card, taken: false }));
+  const startOpen = deck.map((d, i) => (isItem(d.card) ? -1 : i)).filter((i) => i >= 0).slice(0, START_OPEN);
+  const openTurns = Math.max(REVEAL_TURNS[difficulty] ?? 0, 2); // 최소 한 사람당 한 턴은 볼 수 있다
   return {
     phase: 'playing', // playing | gostop | over
     difficulty,
     seed: Math.floor(rng() * 2 ** 31), // 판 위 카드의 흐트러진 배치용 (게임 중 고정)
-    deck: shuffle([...HWATU_CARDS, ...ITEM_CARDS], rng).map((card) => ({ card, taken: false })),
+    deck,
     rngCount: 0, // 아이템 효과용 난수 (seed로부터 결정적으로 만든다)
     itemEvent: null, // 마지막으로 발동한 아이템 { n, who, item }
     flipped: [],
@@ -33,15 +39,15 @@ export function createGame(difficulty, rng = Math.random) {
     tries: 0, // 이번 턴에 사용한 시도 횟수
     captured: { player: [], ai: [] },
     lastHidden: [], // 방금 뒷면으로 돌아간 카드 위치 (판에서 반짝여 알려준다)
-    revealed: [], // 틀린 뒤에도 앞면으로 남아 있는 카드 위치
-    revealLeft: {}, // 위치 -> 앞으로 앞면으로 남아 있을 턴 수
-    memory: [], // 최근에 공개된 (아직 남아있는) 카드 위치
+    revealed: startOpen, // 앞면으로 남아 있는 카드 위치 (시작 때 깔아 둔 카드 + 틀린 뒤 남은 카드)
+    revealLeft: Object.fromEntries(startOpen.map((i) => [i, openTurns])), // 위치 -> 앞으로 앞면으로 남아 있을 턴 수
+    memory: startOpen, // 최근에 공개된 (아직 남아있는) 카드 위치
     goCount: { player: 0, ai: 0 },
     lastGoScore: { player: 0, ai: 0 },
     pendingTurnEnd: null,
     rewardEvent: null,
     bonus: { player: 0, ai: 0 },
-    message: '당신의 턴입니다. 카드 2장을 뒤집으세요!',
+    message: `카드 ${START_OPEN}장이 앞면으로 깔려 있습니다. 당신의 턴입니다!`,
     result: null,
   };
 }
