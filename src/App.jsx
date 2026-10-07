@@ -134,6 +134,18 @@ function ItemToast({ event }) {
   );
 }
 
+function SweepToast({ event }) {
+  return (
+    <div className="item-toast sweep-toast" role="status" aria-live="polite">
+      <div className="sweep-emoji" aria-hidden="true">🧹</div>
+      <div>
+        <strong>{event.who === 'player' ? '내가' : 'AI가'} 판쓸!</strong>
+        <p>{event.stolen ? `상대의 ${event.stolen.name ?? '피'} 한 장을 가져옵니다` : '열린 카드를 모두 먹었습니다 (상대에게 피가 없습니다)'}</p>
+      </div>
+    </div>
+  );
+}
+
 function Menu({ onStart }) {
   return (
     <div className="screen menu-screen">
@@ -154,6 +166,7 @@ function Menu({ onStart }) {
         <p>• 판에는 <b>아이템 패 6장</b>(쌍피 2, 쓰리피, 섞기, 초기화, 엿보기)이 섞여 있습니다. 뒤집으면 그 자리에서 효과가 발동하고 시도 횟수는 쓰지 않습니다. 쌍피·쓰리피는 피 2장·3장으로 계산되어 먹은 패에 들어가고, 섞기는 남은 카드의 위치를 모두 바꾸며, 초기화는 열려 있던 카드를 모두 뒷면으로 돌리고, 엿보기는 쓴 사람만 3초 동안 판의 모든 카드를 볼 수 있게 합니다(상대에게는 보이지 않고, 그동안 카드를 누를 수 없습니다).</p>
         <p>• 광 3점(비광 포함 2점)·4광 4점·5광 15점, 고도리 5점, 홍단·청단·초단 각 3점</p>
         <p>• 열끗·띠는 5장부터 1점(이후 1장당 +1), 피는 10장부터 1점(쌍피는 2장으로 계산)</p>
+        <p>• <b>판쓸</b>: (쉬움) 열려 있던 카드를 짝으로 모두 먹으면 상대의 피 한 장을 가져옵니다.</p>
         <p>• {WIN_THRESHOLD}점 이상이 되면 <b>턴이 끝날 때</b>(남은 2번의 시도를 모두 마친 뒤) <b>고</b>(계속) 또는 <b>스톱</b>(종료)을 선택합니다. 고를 부르면 <b>상대 차례로 넘어가고</b>, 그 뒤에는 점수가 더 올라야 다시 선택할 수 있습니다.</p>
         <p>• 1고 +1, 2고 +2, 3고부터는 점수가 2배씩! 피박·광박이면 각각 2배</p>
         <p>• 오른쪽 아래 버튼으로 배경음악과 효과음을 따로 켜고 끌 수 있습니다. 소리는 브라우저에서 직접 만들어 내며, 설정은 기억됩니다.</p>
@@ -315,6 +328,18 @@ function Game({ state, send }) {
     return () => clearTimeout(id);
   }, [itemN]);
 
+  const sweepN = state?.sweepEvent?.n ?? 0;
+  const [sweepToastN, setSweepToastN] = useState(0);
+  useEffect(() => {
+    if (!sweepN) {
+      setSweepToastN(0);
+      return undefined;
+    }
+    setSweepToastN(sweepN);
+    const id = setTimeout(() => setSweepToastN(0), 2200);
+    return () => clearTimeout(id);
+  }, [sweepN]);
+
   useEffect(() => {
     if (!state || state.phase === 'over') return undefined;
     let id;
@@ -420,6 +445,7 @@ function Game({ state, send }) {
       <CapturedPanel who="ai" title="AI" cards={state.captured.ai} score={aiScore} goCount={state.goCount.ai} active={state.turn === 'ai'} />
 
       {state.itemEvent && toastN === state.itemEvent.n && <ItemToast event={state.itemEvent} />}
+      {state.sweepEvent && sweepToastN === state.sweepEvent.n && <SweepToast event={state.sweepEvent} />}
 
       <div className={`board-wrap ${peekPhase === 'show' ? 'peeking' : ''}`}>
         {peekPhase === 'show' && (

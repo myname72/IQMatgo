@@ -39,6 +39,7 @@ export function createGame(difficulty, rng = Math.random) {
     goCount: { player: 0, ai: 0 },
     lastGoScore: { player: 0, ai: 0 },
     pendingTurnEnd: null,
+    sweepEvent: null,
     message: '당신의 턴입니다. 카드 2장을 뒤집으세요!',
     result: null,
   };
@@ -242,9 +243,35 @@ export function resolveFlip(state) {
 
   if (remainingNormal(next) === 0) return settleEnd(next);
 
+  // 판쓸: 판에 열려 있던 카드를 이번 짝으로 모두 먹으면 상대의 피 한 장을 가져온다
+  if (state.revealed.length > 0 && next.revealed.length === 0) {
+    const sweep = sweepPi(next, who);
+    Object.assign(next, sweep.state, { message: `🧹 판쓸! ${whoLabel(who)}이(가) ${a.month}월 짝으로 열린 카드를 모두 먹었습니다.${sweep.stolen ? ' 상대의 피 한 장을 가져옵니다!' : ''}` });
+  }
+
   // 아직 시도 기회가 남아 있으면 고/스톱은 묻지 않고 턴을 마저 한다
   if (next.tries < MAX_TRIES) return next;
   return finishTurn(next, who, 'tries');
+}
+
+// 판쓸 보상: 상대의 피 중 가치가 가장 낮은 한 장(일반 피 → 쌍피 → 쓰리피 순)을 가져온다
+function sweepPi(state, who) {
+  const foe = other(who);
+  const cand = state.captured[foe].filter((c) => c.piValue > 0).sort((x, y) => x.piValue - y.piValue);
+  const stolen = cand[0] ?? null;
+  const sweepEvent = { n: (state.sweepEvent?.n ?? 0) + 1, who, stolen: stolen ? { ...stolen } : null };
+  if (!stolen) return { state: { sweepEvent }, stolen };
+  return {
+    stolen,
+    state: {
+      sweepEvent,
+      captured: {
+        ...state.captured,
+        [foe]: state.captured[foe].filter((c) => c !== stolen),
+        [who]: [...state.captured[who], stolen],
+      },
+    },
+  };
 }
 
 // 턴이 끝나는 시점에 고/스톱 조건을 확인한다. 남은 카드가 적으면 묻지 않고 스톱한다.

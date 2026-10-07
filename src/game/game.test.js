@@ -438,4 +438,26 @@ describe('아이템 패', () => {
     h = declareGo({ ...h, phase: 'gostop' });
     expect(h.turnEvent).toMatchObject({ to: 'ai', reason: 'go' });
   });
+
+  it('판쓸: 열려 있던 카드를 짝으로 모두 먹으면 상대 피 한 장을 가져온다', () => {
+    let g = createGame('easy');
+    const ms = g.deck.map((s, k) => (s.card.month === 1 ? k : -1)).filter((k) => k >= 0).slice(0, 2);
+    g.revealed = [...ms];
+    g.revealLeft = { [ms[0]]: 3, [ms[1]]: 3 };
+    g.captured.ai = fill('pi', 3);
+    g = resolveFlip(flipCard(flipCard(g, ms[0]), ms[1]));
+    expect(g.sweepEvent).toMatchObject({ who: 'player' });
+    expect(g.captured.ai).toHaveLength(2);
+    expect(g.captured.player.length).toBe(3);
+    // 열린 카드가 남아 있으면 판쓸이 아니다
+    let h = createGame('easy');
+    const m2 = h.deck.map((s, k) => (s.card.month === 1 ? k : -1)).filter((k) => k >= 0).slice(0, 2);
+    const other = h.deck.findIndex((s) => s.card.month === 5);
+    h.revealed = [...m2, other];
+    h.revealLeft = { [m2[0]]: 3, [m2[1]]: 3, [other]: 3 };
+    h.captured.ai = fill('pi', 3);
+    h = resolveFlip(flipCard(flipCard(h, m2[0]), m2[1]));
+    expect(h.sweepEvent).toBeNull();
+    expect(h.captured.ai).toHaveLength(3);
+  });
 });

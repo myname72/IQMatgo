@@ -301,3 +301,7 @@ html, body { overflow-x: clip; }
 .peek-timer i { display: block; height: 6px; border-radius: 3px; background: #ffd84d; transform-origin: left; animation: peek-bar linear forwards; }
 @keyframes peek-bar { from { transform: scaleX(1); } to { transform: scaleX(0); } }
 @media (prefers-reduced-motion: reduce) { .peek-face { animation: none; } }
+
+.sweep-toast { border-color: #7ee0a0; top: calc(env(safe-area-inset-top, 0px) + 140px); }
+.sweep-toast strong { color: #7ee0a0; }
+.sweep-emoji { flex: none; font-size: 2.2rem; width: 56px; text-align: center; }
