@@ -202,3 +202,48 @@ html, body { overflow-x: clip; }
 .icon-btn:focus-visible { outline: 3px solid #ffd700; outline-offset: 2px; }
 .icon-btn.off { opacity: 0.6; }
 .icon-btn.off::after { content: ''; position: absolute; width: 28px; height: 2.5px; background: #ff6b6b; border-radius: 2px; transform: rotate(-45deg); }
+
+/* ---- 턴 표시 ---- */
+.turn-indicator.mine { background: linear-gradient(135deg, #1fa67a, #2b7fd1); box-shadow: 0 4px 16px rgba(43,127,209,0.55); }
+.turn-indicator.theirs { background: linear-gradient(135deg, #d6455d, #e0832b); box-shadow: 0 4px 16px rgba(214,69,93,0.55); }
+.captured { border: 2px solid transparent; transition: border-color 0.2s, box-shadow 0.2s, background 0.2s; }
+.captured.active.captured-player { border-color: #4cc2ff; box-shadow: 0 0 0 2px rgba(76,194,255,0.25), 0 0 22px rgba(76,194,255,0.35); background: rgba(76,194,255,0.1); }
+.captured.active.captured-ai { border-color: #ff7a59; box-shadow: 0 0 0 2px rgba(255,122,89,0.25), 0 0 22px rgba(255,122,89,0.35); background: rgba(255,122,89,0.1); }
+.turn-banner {
+  position: fixed; left: 50%; top: 42%; z-index: 25; pointer-events: none; text-align: center;
+  display: flex; flex-direction: column; align-items: center; gap: 4px;
+  padding: 14px 28px; border-radius: 18px; color: #fff; border: 2px solid rgba(255,255,255,0.6);
+  width: min(88vw, 360px); word-break: keep-all;
+  box-shadow: 0 14px 40px rgba(0,0,0,0.55);
+  animation: turn-banner 1.5s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+}
+.turn-banner strong { font-size: clamp(1.7rem, 7vw, 2.6rem); letter-spacing: 0.04em; text-shadow: 0 2px 8px rgba(0,0,0,0.5); }
+.turn-banner span { font-size: 0.9rem; opacity: 0.92; }
+.turn-banner.mine { background: linear-gradient(135deg, rgba(31,166,122,0.96), rgba(43,127,209,0.96)); }
+.turn-banner.theirs { background: linear-gradient(135deg, rgba(214,69,93,0.96), rgba(224,131,43,0.96)); }
+@keyframes turn-banner {
+  0% { opacity: 0; transform: translate(-50%, -50%) scale(0.7); }
+  14% { opacity: 1; transform: translate(-50%, -50%) scale(1.06); }
+  24% { transform: translate(-50%, -50%) scale(1); }
+  78% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+  100% { opacity: 0; transform: translate(-50%, -62%) scale(0.96); }
+}
+
+/* ---- 고른 카드를 크게, 분명하게 ---- */
+.cards-grid { --select-scale: 2.1; }
+@media (min-width: 700px) { .cards-grid { --select-scale: 1.6; } }
+.slot-face.selected {
+  --reveal-scale: var(--select-scale);
+  z-index: 30; outline: 4px solid #ffd700; outline-offset: -4px;
+  box-shadow: 0 0 0 3px rgba(255,215,0,0.45), 0 0 26px 6px rgba(255,215,0,0.75), 0 10px 24px rgba(0,0,0,0.7);
+  animation: select-flip 0.38s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+@keyframes select-flip {
+  from { opacity: 0.3; filter: brightness(1.6); rotate: 12deg; scale: 0.6; }
+  60% { scale: 1.08; }
+  to { opacity: 1; filter: none; rotate: 0deg; scale: 1; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .turn-banner { animation: none; transform: translate(-50%, -50%); }
+  .slot-face.selected { animation: none; }
+}

@@ -49,14 +49,14 @@ function CapturedRow({ groups, className }) {
   );
 }
 
-function CapturedPanel({ who, title, cards, score, goCount }) {
+function CapturedPanel({ who, title, cards, score, goCount, active = false }) {
   const pick = (kind) => cards.filter((c) => c.kind === kind);
   const pi = cards.filter((c) => c.piValue > 0); // 피, 쌍피, 아이템 쌍피·쓰리피
   const piCount = pi.reduce((sum, c) => sum + c.piValue, 0); // 쌍피는 2장
   const items = scoreItems(cards);
   const piItem = items.find((item) => item.key === 'pi');
   return (
-    <section className="captured" data-who={who} aria-label={`${title}이(가) 먹은 패`}>
+    <section className={`captured ${active ? 'active' : ''} captured-${who}`} data-who={who} aria-label={`${title}이(가) 먹은 패`}>
       <header>
         <strong>{title}</strong>
         <span className={`pi-count ${piCount >= 10 ? 'enough' : ''}`} aria-label={`피 ${piCount}장`}>
@@ -96,6 +96,24 @@ function ItemPop({ event }) {
       <span className="item-pop-ring" />
       <span className="item-pop-ring item-pop-ring2" />
       <div className="item-pop-card"><CardFace card={card} /></div>
+    </div>
+  );
+}
+
+// 턴이 넘어갈 때 화면 가운데에 누구 차례인지 크게 알려 준다
+const TURN_REASON = {
+  start: { player: '카드 2장을 뒤집어 같은 월을 찾으세요' },
+  miss: { player: 'AI가 짝을 맞추지 못했습니다', ai: '짝이 맞지 않았습니다' },
+  tries: { player: `AI가 카드 ${MAX_FLIPS}장을 모두 열었습니다`, ai: `카드 ${MAX_FLIPS}장을 모두 열었습니다` },
+  go: { player: 'AI가 고를 불렀습니다', ai: '고를 불렀습니다' },
+};
+function TurnBanner({ event }) {
+  const mine = event.to === 'player';
+  const sub = TURN_REASON[event.reason]?.[event.to];
+  return (
+    <div className={`turn-banner ${mine ? 'mine' : 'theirs'}`} role="status" aria-live="polite">
+      <strong>{mine ? '당신의 턴' : 'AI의 턴'}</strong>
+      {sub && <span>{sub}</span>}
     </div>
   );
 }
@@ -250,6 +268,19 @@ export default function App() {
 }
 
 function Game({ state, send }) {
+  // 턴 배너: 턴이 넘어갈 때마다 잠깐 보여 준다
+  const turnN = state?.turnEvent?.n ?? 0;
+  const [turnToastN, setTurnToastN] = useState(0);
+  useEffect(() => {
+    if (!turnN) {
+      setTurnToastN(0);
+      return undefined;
+    }
+    setTurnToastN(turnN);
+    const id = setTimeout(() => setTurnToastN(0), 1500);
+    return () => clearTimeout(id);
+  }, [turnN]);
+
   // 아이템 효과 알림: 새 아이템이 발동할 때마다 잠깐 보여 준다
   const itemN = state?.itemEvent?.n ?? 0;
   const [toastN, setToastN] = useState(0);
@@ -267,10 +298,12 @@ function Game({ state, send }) {
     if (!state || state.phase === 'over') return undefined;
     let id;
     if (state.phase === 'playing' && state.flipped.length === 2) {
-      id = setTimeout(() => send({ type: 'RESOLVE' }), 900);
+      id = setTimeout(() => send({ type: 'RESOLVE' }), 1100); // 뒤집은 두 장을 볼 시간
     } else if (state.phase === 'playing' && state.turn === 'ai') {
       // 아이템 연출이 보이는 동안에는 기다렸다가, 끝나면(toastN 변경) 이어서 진행한다
       if (state.itemEvent && toastN === state.itemEvent.n) return undefined;
+      // 턴 배너가 보이는 동안에도 기다린다 (누구 차례인지 눈으로 확인할 시간)
+      if (state.turnEvent && turnToastN === state.turnEvent.n) return undefined;
       id = setTimeout(() => {
         const index = aiChooseFlip(state);
         if (index !== null) send({ type: 'FLIP', index });
@@ -282,7 +315,7 @@ function Game({ state, send }) {
       );
     }
     return () => clearTimeout(id);
-  }, [state, send, toastN]);
+  }, [state, send, toastN, turnToastN]);
 
   if (!state) {
     return <Menu onStart={(difficulty) => send({ type: 'START', difficulty })} />;
@@ -352,7 +385,7 @@ function Game({ state, send }) {
   return (
     <div className="screen game-screen">
       <div className="game-header">
-        <div className="turn-indicator">
+        <div className={`turn-indicator ${state.turn === 'player' ? 'mine' : 'theirs'}`}>
           {state.turn === 'player' ? '🎮 당신의 턴' : '🤖 AI의 턴'}
           <span className="tries"> · 카드 {state.tries * 2 + state.flipped.length}/{MAX_FLIPS}장 오픈</span>
         </div>
@@ -361,9 +394,9 @@ function Game({ state, send }) {
         </button>
       </div>
 
-      <div className="message-box" role="status" aria-live="polite">{state.message}</div>
+      {state.turnEvent && turnToastN === state.turnEvent.n && <TurnBanner event={state.turnEvent} />}
 
-      <CapturedPanel who="ai" title="AI" cards={state.captured.ai} score={aiScore} goCount={state.goCount.ai} />
+      <CapturedPanel who="ai" title="AI" cards={state.captured.ai} score={aiScore} goCount={state.goCount.ai} active={state.turn === 'ai'} />
 
       {state.itemEvent && toastN === state.itemEvent.n && <ItemToast event={state.itemEvent} />}
 
@@ -409,7 +442,7 @@ function Game({ state, send }) {
         })}
       </div>
 
-      <CapturedPanel who="player" title="플레이어" cards={state.captured.player} score={playerScore} goCount={state.goCount.player} />
+      <CapturedPanel who="player" title="플레이어" cards={state.captured.player} score={playerScore} goCount={state.goCount.player} active={state.turn === 'player'} />
 
       {state.phase === 'gostop' && state.turn === 'player' && (
         <div className="gostop-overlay" role="dialog" aria-label="고 또는 스톱">

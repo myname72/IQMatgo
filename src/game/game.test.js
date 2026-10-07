@@ -361,4 +361,26 @@ describe('아이템 패', () => {
     expect(g.lastHidden).toContain(a);
     expect(g.turn).toBe('ai');
   });
+
+  it('턴이 넘어갈 때마다 turnEvent가 이유와 함께 기록된다', () => {
+    let g = createGame('normal');
+    expect(g.turnEvent).toEqual({ n: 1, to: 'player', reason: 'start' });
+    // 틀림
+    const i = g.deck.findIndex((s) => s.card.month === 1);
+    const j = g.deck.findIndex((s) => s.card.month === 2);
+    g = resolveFlip(flipCard(flipCard(g, i), j));
+    expect(g.turnEvent).toEqual({ n: 2, to: 'ai', reason: 'miss' });
+    // 4장 모두 엶: 두 번 연속 맞춤
+    g = { ...g, turn: 'player' };
+    const pair = (m) => g.deck.map((s, k) => (s.card.month === m ? k : -1)).filter((k) => k >= 0).slice(0, 2);
+    g.captured.player = [];
+    g = resolveFlip(flipCard(flipCard(g, ...pair(4).slice(0, 1)), pair(4)[1]));
+    g = resolveFlip(flipCard(flipCard(g, pair(5)[0]), pair(5)[1]));
+    expect(g.turnEvent).toMatchObject({ to: 'ai', reason: 'tries' });
+    // 고
+    let h = createGame('normal');
+    h.captured.player = fill('gwang', 5);
+    h = declareGo({ ...h, phase: 'gostop' });
+    expect(h.turnEvent).toMatchObject({ to: 'ai', reason: 'go' });
+  });
 });

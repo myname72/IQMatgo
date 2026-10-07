@@ -29,6 +29,7 @@ export function createGame(difficulty, rng = Math.random) {
     itemEvent: null, // 마지막으로 발동한 아이템 { n, who, item }
     flipped: [],
     turn: 'player',
+    turnEvent: { n: 1, to: 'player', reason: 'start' },
     tries: 0, // 이번 턴에 사용한 시도 횟수
     captured: { player: [], ai: [] },
     lastHidden: [], // 방금 뒷면으로 돌아간 카드 위치 (판에서 반짝여 알려준다)
@@ -52,6 +53,10 @@ function remember(state, index) {
   memory.push(index);
   return memory.slice(-limit);
 }
+
+// 턴이 넘어갈 때마다 화면에 "누구 차례인지" 알리기 위한 기록
+// reason: start(시작) | miss(짝 못 맞춤) | tries(4장을 모두 엶) | go(고를 부름)
+const turnEventOf = (state, to, reason) => ({ n: (state.turnEvent?.n ?? 0) + 1, to, reason });
 
 const isItem = (card) => card.kind === 'item';
 const remainingNormal = (state) => state.deck.filter((d) => !d.taken && !isItem(d.card)).length;
@@ -213,6 +218,7 @@ export function resolveFlip(state) {
       revealLeft,
       lastHidden,
       turn: other(who),
+      turnEvent: turnEventOf(state, other(who), 'miss'),
       tries: 0,
       message: who === 'player' ? '❌ 짝이 아닙니다. AI의 턴입니다.' : '당신의 턴입니다!',
     };
@@ -277,6 +283,7 @@ function endTurnIfOutOfTries(state) {
     revealLeft,
     lastHidden: hidden,
     turn: other(who),
+    turnEvent: turnEventOf(state, other(who), 'tries'),
     tries: 0,
     message:
       who === 'player'
@@ -302,6 +309,7 @@ export function declareGo(state) {
     revealLeft,
     lastHidden: [...hidden, ...state.flipped],
     turn: other(who),
+    turnEvent: turnEventOf(state, other(who), 'go'),
     tries: 0,
     message: `${whoLabel(who)}이(가) ${goCount}고를 불렀습니다! ${who === 'player' ? 'AI' : '당신'}의 차례입니다.`,
   };
