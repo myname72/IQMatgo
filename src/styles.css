@@ -190,3 +190,15 @@ html, body { overflow-x: clip; }
   .cards-grid.shuffling .back-card, .cards-grid.shuffling .slot-face, .slot-face.peeked { animation: none; }
   .cards-grid.resetting::after { animation: none; display: none; }
 }
+
+/* ---- 소리 켜기/끄기 ---- */
+.sound-controls { position: fixed; right: 12px; bottom: calc(env(safe-area-inset-bottom, 0px) + 12px); z-index: 9; display: flex; gap: 8px; }
+.icon-btn {
+  position: relative; width: 42px; height: 42px; border: 0; border-radius: 12px; cursor: pointer;
+  display: grid; place-items: center; color: #fff; background: rgba(20, 28, 54, 0.82);
+  box-shadow: 0 4px 14px rgba(0,0,0,0.45); backdrop-filter: blur(6px);
+}
+.icon-btn:hover { background: rgba(60, 74, 128, 0.9); }
+.icon-btn:focus-visible { outline: 3px solid #ffd700; outline-offset: 2px; }
+.icon-btn.off { opacity: 0.6; }
+.icon-btn.off::after { content: ''; position: absolute; width: 28px; height: 2.5px; background: #ff6b6b; border-radius: 2px; transform: rotate(-45deg); }

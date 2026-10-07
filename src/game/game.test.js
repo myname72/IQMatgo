@@ -58,7 +58,8 @@ describe('게임 진행', () => {
     const g = createGame('normal');
     // 앞 4장을 1월 4장으로 고정
     const ones = HWATU_CARDS.filter((c) => c.month === 1);
-    const rest = g.deck.filter((s) => s.card.month !== 1);
+    // 아이템 패는 빼서 칸 번호로 일반 카드만 고를 수 있게 한다
+    const rest = g.deck.filter((s) => s.card.month !== 1 && s.card.kind !== 'item');
     g.deck = [...ones.map((card) => ({ card, taken: false })), ...rest];
     return g;
   };

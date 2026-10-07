@@ -1,5 +1,6 @@
-import { useEffect, useLayoutEffect, useReducer, useRef, useState } from 'react';
-import { RotateCcw, Trophy, Hand } from 'lucide-react';
+import { useEffect, useLayoutEffect, useReducer, useRef, useState, useSyncExternalStore } from 'react';
+import { RotateCcw, Trophy, Hand, Music, Volume2, VolumeX } from 'lucide-react';
+import * as audio from './audio/audio.js';
 import CardFace from './components/CardFace.jsx';
 import { ITEM_CARDS, ITEM_INFO } from './game/cards.js';
 import { WIN_THRESHOLD, scoreItems } from './game/scoring.js';
@@ -136,6 +137,7 @@ function Menu({ onStart }) {
         <p>• 열끗·띠는 5장부터 1점(이후 1장당 +1), 피는 10장부터 1점(쌍피는 2장으로 계산)</p>
         <p>• {WIN_THRESHOLD}점 이상이 되면 <b>고</b>(계속) 또는 <b>스톱</b>(종료)을 선택합니다. 고를 부른 뒤에는 점수가 더 올라야 다시 선택할 수 있습니다.</p>
         <p>• 1고 +1, 2고 +2, 3고부터는 점수가 2배씩! 피박·광박이면 각각 2배</p>
+        <p>• 오른쪽 아래 버튼으로 배경음악과 효과음을 따로 켜고 끌 수 있습니다. 소리는 브라우저에서 직접 만들어 내며, 설정은 기억됩니다.</p>
         <p>• 모든 카드를 가져갔는데 {WIN_THRESHOLD}점 이상이 없으면 나가리(무승부)</p>
       </div>
       <p className="credits">
@@ -149,6 +151,72 @@ function Menu({ onStart }) {
   );
 }
 
+// 오른쪽 아래에 떠 있는 배경음악·효과음 켜기/끄기 버튼
+function SoundControls() {
+  const st = useSyncExternalStore(audio.subscribe, audio.getSettings);
+  return (
+    <div className="sound-controls">
+      <button
+        type="button"
+        className={`icon-btn ${st.music ? '' : 'off'}`}
+        onClick={() => audio.setMusic(!st.music)}
+        aria-pressed={st.music}
+        aria-label={st.music ? '배경음악 끄기' : '배경음악 켜기'}
+        title="배경음악"
+      >
+        <Music size={18} />
+      </button>
+      <button
+        type="button"
+        className={`icon-btn ${st.sfx ? '' : 'off'}`}
+        onClick={() => audio.setSfx(!st.sfx)}
+        aria-pressed={st.sfx}
+        aria-label={st.sfx ? '효과음 끄기' : '효과음 켜기'}
+        title="효과음"
+      >
+        {st.sfx ? <Volume2 size={18} /> : <VolumeX size={18} />}
+      </button>
+    </div>
+  );
+}
+
+// 게임 상태가 바뀐 모양을 보고 효과음을 낸다
+function useGameSounds(state) {
+  const prev = useRef(null);
+  useEffect(() => {
+    const p = prev.current;
+    prev.current = state;
+    if (!state) return undefined;
+    if (!p || p.seed !== state.seed) {
+      audio.play('start');
+      return undefined;
+    }
+    const total = (g) => g.captured.player.length + g.captured.ai.length;
+    const timers = [];
+    const later = (ms, name) => timers.push(setTimeout(() => audio.play(name), ms));
+    const itemUsed = state.itemEvent && state.itemEvent.n !== (p.itemEvent?.n ?? 0);
+
+    if (itemUsed) audio.play(state.itemEvent.item);
+    else if (state.flipped.length > p.flipped.length) audio.play('flip');
+    else if (total(state) > total(p)) audio.play('match');
+    else if (p.flipped.length === 2 && state.flipped.length === 0 && state.phase === 'playing') audio.play('miss');
+
+    if (state.turn !== p.turn && state.phase === 'playing') {
+      if (state.turn === 'player') later(380, 'yourTurn');
+      else later(150, 'turnEnd');
+    }
+    if (state.phase === 'gostop' && p.phase !== 'gostop') later(250, 'gostop');
+    if (p.phase === 'gostop' && state.phase === 'playing') audio.play('go');
+    if (state.phase === 'over' && p.phase !== 'over') {
+      const r = state.result;
+      const stopped = r.how === 'stop' || r.how === 'auto';
+      if (stopped) audio.play('stop');
+      later(stopped ? 900 : 200, r.winner === 'player' ? 'win' : r.winner === 'ai' ? 'lose' : 'draw');
+    }
+    return () => timers.forEach(clearTimeout);
+  }, [state]);
+}
+
 function appReducer(state, action) {
   if (action.type === 'MENU') return null;
   if (action.type === 'START') return createGame(action.difficulty);
@@ -159,7 +227,26 @@ function appReducer(state, action) {
 // state === null 이면 메뉴 화면
 export default function App() {
   const [state, send] = useReducer(appReducer, null);
-  return <Game state={state} send={send} />;
+  // 첫 입력에서 소리를 켜고, 버튼을 누를 때마다 딸깍 소리를 낸다
+  useEffect(() => {
+    const onPointerDown = () => audio.unlock();
+    const onClick = (e) => {
+      if (e.target.closest?.('.btn, .go-button')) audio.play('click');
+    };
+    document.addEventListener('pointerdown', onPointerDown);
+    document.addEventListener('click', onClick);
+    return () => {
+      document.removeEventListener('pointerdown', onPointerDown);
+      document.removeEventListener('click', onClick);
+    };
+  }, []);
+  useGameSounds(state);
+  return (
+    <>
+      <Game state={state} send={send} />
+      <SoundControls />
+    </>
+  );
 }
 
 function Game({ state, send }) {
