@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { HWATU_CARDS } from './cards.js';
 import { calculateScore, applyGo, finalPayout } from './scoring.js';
-import { REVEAL_LIMIT, MAX_TRIES, createGame, flipCard, resolveFlip, declareGo, declareStop, aiChooseFlip, scoreOf } from './engine.js';
+import { REVEAL_TURNS, MAX_TRIES, createGame, flipCard, resolveFlip, declareGo, declareStop, aiChooseFlip, scoreOf } from './engine.js';
 
 const byName = (...names) => names.map((n) => HWATU_CARDS.find((c) => c.name === n));
 const fill = (kind, n) => HWATU_CARDS.filter((c) => c.kind === kind).slice(0, n);
@@ -134,21 +134,37 @@ describe('게임 진행', () => {
     expect(g.turn).toBe('ai');
     expect(g.tries).toBe(0);
   });
-  it('쉬움: 틀린 카드는 최근 6장까지만 앞면으로 유지된다', () => {
+  it('쉬움: 틀린 카드는 5턴 동안 앞면으로 유지되고 6번째 턴 시작 전에 뒷면으로 돌아간다', () => {
     let g = createGame('easy');
-    expect(REVEAL_LIMIT.easy).toBe(6);
-    const miss = (a, b) => {
-      g = resolveFlip(flipCard(flipCard(g, a), b));
-      g = { ...g, turn: 'player', tries: 0 }; // 연속 시도 시험용
-    };
-    // 월이 서로 다른 카드 8장 (0..7이 아니라 월별 첫 카드)
-    const firsts = [1, 2, 3, 4, 5, 6, 7, 8].map((m) => g.deck.findIndex((s) => s.card.month === m));
-    miss(firsts[0], firsts[1]);
-    miss(firsts[2], firsts[3]);
-    miss(firsts[4], firsts[5]);
-    expect(g.revealed).toEqual(firsts.slice(0, 6));
-    miss(firsts[6], firsts[7]);
-    expect(g.revealed).toEqual(firsts.slice(2, 8)); // 가장 오래된 2장이 뒤집힌다
+    expect(REVEAL_TURNS.easy).toBe(5);
+    const firsts = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map((m) => g.deck.findIndex((s) => s.card.month === m));
+    const miss = (a, b) => { g = resolveFlip(flipCard(flipCard(g, a), b)); };
+    miss(firsts[0], firsts[1]); // 턴1 종료: 두 장이 5턴짜리로 열림
+    expect(g.revealed.sort()).toEqual([firsts[0], firsts[1]].sort());
+    expect(g.revealLeft[firsts[0]]).toBe(5);
+    miss(firsts[2], firsts[3]); // 턴2 종료
+    miss(firsts[4], firsts[5]); // 턴3 종료
+    miss(firsts[6], firsts[7]); // 턴4 종료
+    expect(g.revealLeft[firsts[0]]).toBe(2);
+    miss(firsts[8], firsts[9]); // 턴5 종료: 아직 1턴 남음
+    expect(g.revealLeft[firsts[0]]).toBe(1);
+    expect(g.revealed).toContain(firsts[0]);
+    expect(g.lastHidden).toEqual([]);
+    miss(firsts[10], firsts[11]); // 턴6 종료: 처음 두 장이 뒷면으로
+    expect(g.revealed).not.toContain(firsts[0]);
+    expect(g.revealed).not.toContain(firsts[1]);
+    expect(g.lastHidden.sort()).toEqual([firsts[0], firsts[1]].sort());
+  });
+  it('쉬움: 열린 카드를 다시 골라 또 틀리면 5턴이 새로 시작된다', () => {
+    let g = createGame('easy');
+    const f = [1, 2, 3, 4].map((m) => g.deck.findIndex((s) => s.card.month === m));
+    g = resolveFlip(flipCard(flipCard(g, f[0]), f[1]));
+    g = resolveFlip(flipCard(flipCard(g, f[2]), f[3]));
+    expect(g.revealLeft[f[0]]).toBe(4);
+    g = resolveFlip(flipCard(flipCard(g, f[0]), f[2])); // f[0]를 다시 골라 틀림
+    expect(g.revealLeft[f[0]]).toBe(5);
+    expect(g.revealLeft[f[2]]).toBe(5);
+    expect(g.revealLeft[f[1]]).toBe(3);
   });
   it('쉬움: 앞면 카드 2장을 골라 짝을 맞출 수 있고 유지 목록에서 빠진다', () => {
     let g = createGame('easy');
@@ -178,20 +194,6 @@ describe('게임 진행', () => {
     expect(month1.slice(0, 2)).toContain(aiChooseFlip(g));
     g = { ...g, flipped: [month1[0]] };
     expect(aiChooseFlip(g)).toBe(month1[1]);
-  });
-  it('쉬움: 6장을 넘어 뒷면으로 돌아간 카드를 lastHidden으로 알려준다', () => {
-    let g = createGame('easy');
-    const firsts = [1, 2, 3, 4, 5, 6, 7, 8].map((m) => g.deck.findIndex((s) => s.card.month === m));
-    const miss = (a, b) => {
-      g = resolveFlip(flipCard(flipCard(g, a), b));
-      g = { ...g, turn: 'player', tries: 0 };
-    };
-    miss(firsts[0], firsts[1]);
-    miss(firsts[2], firsts[3]);
-    miss(firsts[4], firsts[5]);
-    expect(g.lastHidden).toEqual([]);
-    miss(firsts[6], firsts[7]);
-    expect(g.lastHidden.sort()).toEqual([firsts[0], firsts[1]].sort());
   });
   it('보통: 틀린 두 장이 방금 뒷면으로 돌아간 카드로 표시된다', () => {
     let g = createGame('normal');

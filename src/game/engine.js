@@ -4,8 +4,8 @@ import { calculateScore, finalPayout, WIN_THRESHOLD } from './scoring.js';
 // AI가 기억하는 카드 수 (난이도)
 export const MEMORY_LIMIT = { easy: 4, normal: 8, hard: 14 };
 
-// 틀린 카드를 앞면으로 유지하는 장수 (쉬움에서만)
-export const REVEAL_LIMIT = { easy: 6, normal: 0, hard: 0 };
+// 틀린 카드를 앞면으로 유지하는 턴 수 (쉬움에서만). 사람과 AI의 턴을 모두 센다.
+export const REVEAL_TURNS = { easy: 5, normal: 0, hard: 0 };
 
 // 한 턴에 열 수 있는 카드는 최대 4장 (= 2장씩 2번 시도, 맞춰도 소모)
 export const MAX_FLIPS = 4;
@@ -24,7 +24,8 @@ export function createGame(difficulty, rng = Math.random) {
     tries: 0, // 이번 턴에 사용한 시도 횟수
     captured: { player: [], ai: [] },
     lastHidden: [], // 방금 뒷면으로 돌아간 카드 위치 (판에서 반짝여 알려준다)
-    revealed: [], // 틀린 뒤에도 앞면으로 남아 있는 카드 위치 (오래된 것부터)
+    revealed: [], // 틀린 뒤에도 앞면으로 남아 있는 카드 위치
+    revealLeft: {}, // 위치 -> 앞으로 앞면으로 남아 있을 턴 수
     memory: [], // 최근에 공개된 (아직 남아있는) 카드 위치
     goCount: { player: 0, ai: 0 },
     lastGoScore: { player: 0, ai: 0 },
@@ -102,15 +103,22 @@ export function resolveFlip(state) {
   const who = state.turn;
 
   if (a.month !== b.month) {
-    const limit = REVEAL_LIMIT[state.difficulty];
-    const revealed = limit
-      ? [...state.revealed.filter((k) => k !== i && k !== j), i, j].slice(-limit)
-      : [];
-    const lastHidden = [...new Set([...state.revealed, i, j])].filter((k) => !revealed.includes(k));
+    // 턴이 넘어가므로 기존에 열려 있던 카드의 남은 턴을 하나 줄이고,
+    // 방금 틀린 두 장은 새로 정해진 턴 수만큼 앞면으로 유지한다.
+    const turns = REVEAL_TURNS[state.difficulty];
+    const { revealed, revealLeft, hidden } = tickReveal(state, [i, j]);
+    if (turns) {
+      for (const k of [i, j]) {
+        revealLeft[k] = turns;
+        if (!revealed.includes(k)) revealed.push(k);
+      }
+    }
+    const lastHidden = [...new Set([...hidden, ...(turns ? [] : [i, j])])];
     return {
       ...state,
       flipped: [],
       revealed,
+      revealLeft,
       lastHidden,
       turn: other(who),
       tries: 0,
@@ -126,6 +134,7 @@ export function resolveFlip(state) {
     tries: state.tries + 1,
     lastHidden: [],
     revealed: state.revealed.filter((k) => k !== i && k !== j),
+    revealLeft: Object.fromEntries(Object.entries(state.revealLeft).filter(([k]) => +k !== i && +k !== j)),
     memory: state.memory.filter((k) => k !== i && k !== j),
     captured: { ...state.captured, [who]: [...state.captured[who], a, b] },
   };
@@ -141,12 +150,34 @@ export function resolveFlip(state) {
   return endTurnIfOutOfTries(next);
 }
 
+// 턴이 넘어갈 때: 열려 있는 카드의 남은 턴을 하나씩 줄이고 0이 되면 뒷면으로 돌린다
+function tickReveal(state, skip = []) {
+  const revealed = [];
+  const revealLeft = {};
+  const hidden = [];
+  for (const k of state.revealed) {
+    if (skip.includes(k)) continue; // 이번에 다시 틀린 카드는 새로 정해진다
+    const left = (state.revealLeft[k] ?? 1) - 1;
+    if (left > 0) {
+      revealed.push(k);
+      revealLeft[k] = left;
+    } else {
+      hidden.push(k);
+    }
+  }
+  return { revealed, revealLeft, hidden };
+}
+
 // 맞춰서 턴이 이어지더라도 시도 횟수를 다 쓰면 상대에게 넘어간다
 function endTurnIfOutOfTries(state) {
   if (state.tries < MAX_TRIES) return state;
   const who = state.turn;
+  const { revealed, revealLeft, hidden } = tickReveal(state);
   return {
     ...state,
+    revealed,
+    revealLeft,
+    lastHidden: hidden,
     turn: other(who),
     tries: 0,
     message:

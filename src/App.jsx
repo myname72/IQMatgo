@@ -10,7 +10,7 @@ import {
   aiDecideGoStop,
   MEMORY_LIMIT,
   MAX_FLIPS,
-  REVEAL_LIMIT,
+  REVEAL_TURNS,
 } from './game/engine.js';
 
 const DIFFICULTIES = [
@@ -28,35 +28,38 @@ function hash01(seed, i, k) {
   return (x >>> 0) / 2 ** 32;
 }
 
-// 먹은 패: 1줄에 광·열끗·띠, 2줄에 피. 줄 안에서는 겹쳐서 쌓는다.
-function CapturedRow({ cards, className }) {
+// 먹은 패: 1줄에 광·열끗·띠(종류별로 묶어 간격을 두고), 2줄에 피. 같은 줄·같은 종류는 가로로 겹쳐 쌓는다.
+function CapturedRow({ groups, className }) {
+  const filled = groups.filter((g) => g.length > 0);
+  const n = filled.reduce((sum, g) => sum + g.length, 0);
+  const style = { '--g': Math.max(filled.length, 1), '--k': Math.max(n - filled.length, 1) };
   return (
-    <div className={`captured-row ${className}`} style={{ '--n': Math.max(cards.length, 2) }}>
-      {cards.map((c) => (
-        <div className="mini" key={c.id} title={c.name}>
-          <CardFace card={c} />
-        </div>
-      ))}
+    <div className={`captured-row ${className}`} style={style}>
+      {filled.map((g) =>
+        g.map((c, i) => (
+          <div className={`mini ${i > 0 ? 'joint' : 'gap'}`} key={c.id} title={c.name}>
+            <CardFace card={c} />
+          </div>
+        )),
+      )}
     </div>
   );
 }
 
 function CapturedPanel({ title, cards, score, goCount }) {
-  const upper = [
-    ...cards.filter((c) => c.kind === 'gwang'),
-    ...cards.filter((c) => c.kind === 'animal'),
-    ...cards.filter((c) => c.kind === 'ribbon'),
-  ];
+  const pick = (kind) => cards.filter((c) => c.kind === kind);
   const pi = cards.filter((c) => c.kind === 'pi' || c.kind === 'ssangpi');
+  const piCount = pi.reduce((sum, c) => sum + c.piValue, 0); // 쌍피는 2장
   return (
     <section className="captured" aria-label={`${title}이(가) 먹은 패`}>
       <header>
         <strong>{title}</strong>
+        <span className={`pi-count ${piCount >= 10 ? 'enough' : ''}`} aria-label={`피 ${piCount}장`}>피 {piCount}</span>
         <span className="captured-score">{score}점{goCount > 0 && ` · ${goCount}고`}</span>
       </header>
       <div className="captured-rows">
-        <CapturedRow cards={upper} className="row-upper" />
-        <CapturedRow cards={pi} className="row-pi" />
+        <CapturedRow groups={[pick('gwang'), pick('animal'), pick('ribbon')]} className="row-upper" />
+        <CapturedRow groups={[pi]} className="row-pi" />
       </div>
     </section>
   );
@@ -71,14 +74,14 @@ function Menu({ onStart }) {
         {DIFFICULTIES.map((d) => (
           <button key={d.key} className={`btn ${d.cls}`} onClick={() => onStart(d.key)}>
             <span>{d.label}</span>
-            <small>(AI 기억력: {MEMORY_LIMIT[d.key]}장{REVEAL_LIMIT[d.key] > 0 && ` · 틀린 카드 ${REVEAL_LIMIT[d.key]}장 유지`})</small>
+            <small>(AI 기억력: {MEMORY_LIMIT[d.key]}장{REVEAL_TURNS[d.key] > 0 && ` · 틀린 카드 ${REVEAL_TURNS[d.key]}턴 유지`})</small>
           </button>
         ))}
       </div>
       <div className="rules">
         <h3>게임 규칙</h3>
         <p>• 화투 48장 중 같은 월 2장을 뒤집어 맞추면 가져가고 한 번 더 뒤집을 수 있습니다. 틀리거나, 한 턴에 카드 4장(2번 시도)을 모두 열면 맞췄어도 상대 차례입니다.</p>
-        <p>• 쉬움 난이도에서는 틀린 카드가 최근 6장까지 앞면으로 남아 있고, 앞면인 카드도 다시 골라 짝을 맞출 수 있습니다. 점선 테두리 카드는 다음에 틀리면 뒷면으로 돌아갑니다.</p>
+        <p>• 쉬움 난이도에서는 틀린 카드가 5턴(사람과 AI의 턴을 모두 셉니다) 동안 앞면으로 남아 있고, 앞면인 카드도 다시 골라 짝을 맞출 수 있습니다. 카드 모서리의 숫자는 남은 턴이고, 점선 테두리 카드는 이번 턴이 끝나면 뒷면으로 돌아갑니다.</p>
         <p>• 광 3점(비광 포함 2점)·4광 4점·5광 15점, 고도리 5점, 홍단·청단·초단 각 3점</p>
         <p>• 열끗·띠는 5장부터 1점(이후 1장당 +1), 피는 10장부터 1점(쌍피는 2장으로 계산)</p>
         <p>• {WIN_THRESHOLD}점 이상이 되면 <b>고</b>(계속) 또는 <b>스톱</b>(종료)을 선택합니다. 고를 부른 뒤에는 점수가 더 올라야 다시 선택할 수 있습니다.</p>
@@ -135,9 +138,8 @@ function Game({ state, send }) {
   const playerScore = scoreOf(state, 'player');
   const aiScore = scoreOf(state, 'ai');
   // 다음에 틀리면 뒷면으로 돌아갈 카드 (가장 오래된 것부터)
-  const limit = REVEAL_LIMIT[state.difficulty];
-  const dropCount = limit ? Math.max(0, state.revealed.length + 2 - limit) : 0;
-  const dropping = new Set(state.revealed.filter((i) => !state.flipped.includes(i)).slice(0, dropCount));
+  // 이번 턴이 끝나면 뒷면으로 돌아갈 카드 (남은 턴이 1)
+  const dropping = new Set(state.revealed.filter((i) => state.revealLeft[i] === 1));
   const canClick = state.phase === 'playing' && state.turn === 'player' && state.flipped.length < 2;
 
   if (state.phase === 'over') {
@@ -200,9 +202,10 @@ function Game({ state, send }) {
                   style={{ transform: `translate(${dx}px, ${dy}px) rotate(${rot}deg) scale(1.2)` }}
                   onClick={() => send({ type: 'FLIP', index })}
                   disabled={!canClick || selected}
-                  title={dropping.has(index) ? '다음에 틀리면 뒷면으로 돌아갑니다' : undefined}
+                  title={`앞면 유지 ${state.revealLeft[index] ?? ''}턴 남음`}
                 >
                   <CardFace card={slot.card} />
+                  {state.revealLeft[index] > 0 && <span className="left-badge">{state.revealLeft[index]}</span>}
                 </button>
               ) : (
                 <button
