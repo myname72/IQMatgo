@@ -40,7 +40,7 @@ body {
 /* 먹은 패: 2줄 고정(1줄 광·열끗·띠 / 2줄 피). 같은 종류끼리 가로로 살짝 겹치고 종류 사이는 벌린다 */
 .captured { --w: 36px; --gap: 12px; width: 100%; max-width: var(--game-max); background: rgba(255,255,255,0.07); border-radius: 12px; padding: 0.35rem 0.6rem 0.5rem; }
 @media (min-width: 700px) { .captured { --w: 48px; --gap: 18px; } }
-.captured header { display: flex; align-items: center; gap: 0.6rem; margin-bottom: 0.25rem; }
+.captured header { display: flex; flex-wrap: wrap; align-items: center; gap: 0.25rem 0.6rem; margin-bottom: 0.25rem; }
 .captured-score { margin-left: auto; font-weight: 900; }
 .pi-count { padding: 1px 8px; border-radius: 999px; font-size: 0.8rem; font-weight: 700; background: rgba(255,255,255,0.14); font-variant-numeric: tabular-nums; }
 .pi-count.enough { background: #ffd700; color: #1a1a2e; }
@@ -112,8 +112,8 @@ body {
 
 .left-badge { position: absolute; top: 2px; left: 2px; min-width: 14px; height: 14px; padding: 0 3px; border-radius: 7px; background: #ffd700; color: #1a1a2e; font: 800 0.65rem/14px 'Noto Serif KR', serif; text-align: center; box-shadow: 0 1px 3px rgba(0,0,0,0.5); }
 
-.captured-chips { display: flex; flex: 1; min-width: 0; gap: 4px; overflow-x: auto; scrollbar-width: none; }
-.captured-chips::-webkit-scrollbar { display: none; }
+.captured-chips { display: flex; flex: 1 0 100%; order: 3; min-width: 0; flex-wrap: wrap; gap: 4px; }
+.captured-chips:empty { display: none; }
 .chip { flex: none; white-space: nowrap; padding: 1px 8px; border-radius: 999px; font-size: 0.72rem; font-weight: 700; background: rgba(255,215,0,0.16); color: #ffe27a; border: 1px solid rgba(255,215,0,0.35); font-variant-numeric: tabular-nums; }
 
 .over-how { opacity: 0.8; font-size: 0.9rem; }
@@ -338,3 +338,14 @@ html, body { overflow-x: clip; }
 @keyframes bomb-shake { 0%, 100% { transform: translate(0, 0); } 10% { transform: translate(-9px, 6px); } 20% { transform: translate(8px, -7px); } 30% { transform: translate(-7px, -5px); } 45% { transform: translate(6px, 5px); } 60% { transform: translate(-4px, 3px); } 80% { transform: translate(2px, -2px); } }
 body:has(.burst-bomb) #root { animation: bomb-shake 0.6s ease-out; }
 @media (prefers-reduced-motion: reduce) { .burst-ring { display: none !important; } body:has(.burst-bomb) #root { animation: none; } }
+
+/* 게임 화면: 소리 버튼은 위쪽 줄(메뉴 버튼 옆)에 둬서 먹은 패를 가리지 않는다 */
+.header-actions { display: flex; align-items: center; gap: 8px; flex: none; }
+.sound-controls.inline { position: static; gap: 6px; }
+.sound-controls.inline .icon-btn { width: 36px; height: 36px; border-radius: 10px; }
+.game-header .turn-indicator { min-width: 0; font-size: 0.95rem; }
+@media (max-width: 420px) {
+  .game-header .turn-indicator { padding: 0.4rem 0.6rem; font-size: 0.82rem; }
+  .game-header .btn span { display: none; }
+  .game-header .btn { padding: 0.45rem 0.6rem; }
+}

@@ -208,10 +208,10 @@ function Menu({ onStart }) {
 }
 
 // 오른쪽 아래에 떠 있는 배경음악·효과음 켜기/끄기 버튼
-function SoundControls() {
+function SoundControls({ inline = false }) {
   const st = useSyncExternalStore(audio.subscribe, audio.getSettings);
   return (
-    <div className="sound-controls">
+    <div className={`sound-controls ${inline ? 'inline' : ''}`}>
       <button
         type="button"
         className={`icon-btn ${st.music ? '' : 'off'}`}
@@ -309,7 +309,7 @@ export default function App() {
   return (
     <>
       <Game state={state} send={send} />
-      <SoundControls />
+      {(!state || state.phase === 'over') && <SoundControls />}
     </>
   );
 }
@@ -468,9 +468,12 @@ function Game({ state, send }) {
           {state.turn === 'player' ? '🎮 당신의 턴' : '🤖 AI의 턴'}
           <span className="tries"> · 카드 {state.tries * 2 + state.flipped.length}/{MAX_FLIPS}장 오픈</span>
         </div>
-        <button className="btn btn-primary" onClick={() => send({ type: 'MENU' })}>
-          <RotateCcw size={18} /> <span>메뉴로</span>
-        </button>
+        <div className="header-actions">
+          <SoundControls inline />
+          <button className="btn btn-primary" onClick={() => send({ type: 'MENU' })}>
+            <RotateCcw size={18} /> <span>메뉴로</span>
+          </button>
+        </div>
       </div>
 
       {state.turnEvent && turnToastN === state.turnEvent.n && <TurnBanner event={state.turnEvent} />}
