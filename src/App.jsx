@@ -20,6 +20,15 @@ const DIFFICULTIES = [
   { key: 'hard', label: '어려움', cls: 'btn-hard' },
 ];
 
+// 게임마다 고정된 0~1 난수 (카드 위치별)
+function hash01(seed, i, k) {
+  let x = Math.imul(seed ^ Math.imul(i + 1, 374761393) ^ Math.imul(k + 1, 668265263), 2246822519);
+  x ^= x >>> 13;
+  x = Math.imul(x, 3266489917);
+  x ^= x >>> 16;
+  return (x >>> 0) / 2 ** 32;
+}
+
 function CapturedPanel({ title, cards, score, goCount }) {
   const s = summarize(cards);
   const groups = [
@@ -44,13 +53,20 @@ function CapturedPanel({ title, cards, score, goCount }) {
         광 {s.gwang.length} · 열끗 {s.animals.length} · 띠 {s.ribbons.length} · 피 {s.piCount}
         {tags.length > 0 && <span className="tags"> ✦ {tags.join(' ')}</span>}
       </div>
-      <div className="captured-cards">
+      <div className="captured-groups">
         {groups.map(([kind, list]) =>
-          list.map((c) => (
-            <div className="mini" key={c.id} title={`${c.name} (${KIND_LABEL[c.kind]}${c.ribbon ? ' · ' + ribbonLabel(c.ribbon) : ''})`}>
-              <CardFace card={c} compact />
+          list.length > 0 && (
+            <div className="captured-group" key={kind}>
+              <span className="group-label">{KIND_LABEL[kind]}</span>
+              <div className="captured-cards">
+                {list.map((c) => (
+                  <div className="mini" key={c.id} title={`${c.name} (${KIND_LABEL[c.kind]}${c.ribbon ? ' · ' + ribbonLabel(c.ribbon) : ''})`}>
+                    <CardFace card={c} compact />
+                  </div>
+                ))}
+              </div>
             </div>
-          )),
+          ),
         )}
       </div>
     </section>
@@ -123,6 +139,10 @@ function Game({ state, send }) {
 
   const playerScore = scoreOf(state, 'player');
   const aiScore = scoreOf(state, 'ai');
+  const trayIndexes = [
+    ...state.revealed,
+    ...state.flipped.filter((i) => !state.revealed.includes(i)),
+  ];
   const canClick = state.phase === 'playing' && state.turn === 'player' && state.flipped.length < 2;
 
   if (state.phase === 'over') {
@@ -169,23 +189,49 @@ function Game({ state, send }) {
 
       <CapturedPanel title="AI" cards={state.captured.ai} score={aiScore} goCount={state.goCount.ai} />
 
-      <div className="cards-grid">
+      <div className="cards-grid" aria-label="카드 판">
         {state.deck.map((slot, index) => {
           const selected = state.flipped.includes(index);
-          const faceUp = slot.taken || selected || state.revealed.includes(index);
+          const up = selected || state.revealed.includes(index);
+          const dx = (hash01(state.seed, index, 1) - 0.5) * 6;
+          const dy = (hash01(state.seed, index, 2) - 0.5) * 6;
+          const rot = (hash01(state.seed, index, 3) - 0.5) * 10;
+          return (
+            <div className="slot" key={slot.card.id}>
+              {slot.taken ? null : up ? (
+                <span className="ghost" aria-hidden="true" />
+              ) : (
+                <button
+                  type="button"
+                  className="back-card"
+                  style={{ transform: `translate(${dx}px, ${dy}px) rotate(${rot}deg)` }}
+                  onClick={() => send({ type: 'FLIP', index })}
+                  disabled={!canClick}
+                  aria-label="뒤집지 않은 카드"
+                >
+                  <span className="card-pattern" />
+                </button>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      <div className="tray" aria-label="열려 있는 카드">
+        {trayIndexes.length === 0 && <p className="tray-empty">열려 있는 카드가 여기에 크게 보입니다</p>}
+        {trayIndexes.map((index) => {
+          const card = state.deck[index].card;
+          const selected = state.flipped.includes(index);
           return (
             <button
-              key={slot.card.id}
+              key={card.id}
               type="button"
-              className={`card ${faceUp ? 'flipped' : ''} ${slot.taken ? 'taken' : ''} ${selected ? 'selected' : ''}`}
+              className={`tray-card ${selected ? 'selected' : ''}`}
               onClick={() => send({ type: 'FLIP', index })}
-              disabled={!canClick || slot.taken || selected}
-              aria-label={faceUp ? `${slot.card.month}월 ${slot.card.name}` : '뒤집지 않은 카드'}
+              disabled={!canClick || selected}
+              aria-label={`${card.month}월 ${card.name}`}
             >
-              <span className="card-inner">
-                <span className="card-back"><span className="card-pattern" /></span>
-                <span className="card-front"><CardFace card={slot.card} /></span>
-              </span>
+              <CardFace card={card} />
             </button>
           );
         })}

@@ -17,6 +17,7 @@ export function createGame(difficulty, rng = Math.random) {
   return {
     phase: 'playing', // playing | gostop | over
     difficulty,
+    seed: Math.floor(rng() * 2 ** 31), // 판 위 카드의 흐트러진 배치용 (게임 중 고정)
     deck: shuffle(HWATU_CARDS, rng).map((card) => ({ card, taken: false })),
     flipped: [],
     turn: 'player',
