@@ -32,17 +32,31 @@ export function gwangScore(gwang) {
   return 0;
 }
 
-export function calculateScore(cards) {
+function gwangLabel(gwang) {
+  const n = gwang.length;
+  if (n === 5) return '오광';
+  if (n === 4) return '사광';
+  return gwang.some((c) => c.month === 12) ? '비삼광' : '삼광';
+}
+
+// 점수가 나는 항목들 (화면에 표시하고, 합계가 곧 점수)
+export function scoreItems(cards) {
   const s = summarize(cards);
-  let score = gwangScore(s.gwang);
-  if (s.godori) score += 5;
-  if (s.hongdan) score += 3;
-  if (s.cheongdan) score += 3;
-  if (s.chodan) score += 3;
-  if (s.animals.length >= 5) score += s.animals.length - 4;
-  if (s.ribbons.length >= 5) score += s.ribbons.length - 4;
-  if (s.piCount >= 10) score += s.piCount - 9;
-  return score;
+  const items = [];
+  const g = gwangScore(s.gwang);
+  if (g > 0) items.push({ key: 'gwang', label: gwangLabel(s.gwang), points: g });
+  if (s.godori) items.push({ key: 'godori', label: '고도리', points: 5 });
+  if (s.hongdan) items.push({ key: 'hongdan', label: '홍단', points: 3 });
+  if (s.cheongdan) items.push({ key: 'cheongdan', label: '청단', points: 3 });
+  if (s.chodan) items.push({ key: 'chodan', label: '초단', points: 3 });
+  if (s.animals.length >= 5) items.push({ key: 'animal', label: `열끗 ${s.animals.length}장`, points: s.animals.length - 4 });
+  if (s.ribbons.length >= 5) items.push({ key: 'ribbon', label: `띠 ${s.ribbons.length}장`, points: s.ribbons.length - 4 });
+  if (s.piCount >= 10) items.push({ key: 'pi', label: `피 ${s.piCount}장`, points: s.piCount - 9 });
+  return items;
+}
+
+export function calculateScore(cards) {
+  return scoreItems(cards).reduce((sum, item) => sum + item.points, 0);
 }
 
 // 고 횟수 보너스: 1고 +1, 2고 +2, 3고부터 2배씩
@@ -63,9 +77,21 @@ export function detectBak(winnerCards, loserCards) {
 }
 
 export function finalPayout(winnerCards, loserCards, goCount) {
+  const items = scoreItems(winnerCards);
   const base = calculateScore(winnerCards);
   const withGo = applyGo(base, goCount);
   const { pibak, gwangbak } = detectBak(winnerCards, loserCards);
   const multiplier = (pibak ? 2 : 1) * (gwangbak ? 2 : 1);
-  return { base, goCount, pibak, gwangbak, total: withGo * multiplier };
+  const l = summarize(loserCards);
+  return {
+    items,
+    base,
+    goCount,
+    withGo,
+    pibak,
+    gwangbak,
+    loserPi: l.piCount,
+    loserGwang: l.gwang.length,
+    total: withGo * multiplier,
+  };
 }

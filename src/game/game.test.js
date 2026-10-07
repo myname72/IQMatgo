@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { HWATU_CARDS } from './cards.js';
-import { calculateScore, applyGo, finalPayout } from './scoring.js';
+import { calculateScore, scoreItems, applyGo, finalPayout } from './scoring.js';
 import { REVEAL_TURNS, MAX_TRIES, createGame, flipCard, resolveFlip, declareGo, declareStop, aiChooseFlip, scoreOf } from './engine.js';
 
 const byName = (...names) => names.map((n) => HWATU_CARDS.find((c) => c.name === n));
@@ -201,5 +201,12 @@ describe('게임 진행', () => {
     const j = g.deck.findIndex((s) => s.card.month === 2);
     g = resolveFlip(flipCard(flipCard(g, i), j));
     expect(g.lastHidden.sort()).toEqual([i, j].sort());
+  });
+  it('득점 항목 내역이 합계와 일치한다', () => {
+    const cards = [...byName('송학광', '벚꽃광', '비광'), ...byName('매조', '흑싸리새', '공산기러기'), ...byName('송학띠', '매조띠', '벚꽃띠')];
+    const items = scoreItems(cards);
+    expect(items.map((i) => i.label)).toEqual(['비삼광', '고도리', '홍단']);
+    expect(items.reduce((a, i) => a + i.points, 0)).toBe(calculateScore(cards));
+    expect(calculateScore(cards)).toBe(2 + 5 + 3);
   });
 });

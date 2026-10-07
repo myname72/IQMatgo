@@ -1,7 +1,7 @@
 import { useEffect, useReducer } from 'react';
 import { RotateCcw, Trophy, Hand } from 'lucide-react';
 import CardFace from './components/CardFace.jsx';
-import { WIN_THRESHOLD } from './game/scoring.js';
+import { WIN_THRESHOLD, scoreItems } from './game/scoring.js';
 import {
   gameReducer,
   createGame,
@@ -57,6 +57,11 @@ function CapturedPanel({ title, cards, score, goCount }) {
         <span className={`pi-count ${piCount >= 10 ? 'enough' : ''}`} aria-label={`피 ${piCount}장`}>피 {piCount}</span>
         <span className="captured-score">{score}점{goCount > 0 && ` · ${goCount}고`}</span>
       </header>
+      <div className="captured-chips" aria-label="점수 조합">
+        {scoreItems(cards).map((item) => (
+          <span className="chip" key={item.key}>{item.label} +{item.points}</span>
+        ))}
+      </div>
       <div className="captured-rows">
         <CapturedRow groups={[pick('gwang'), pick('animal'), pick('ribbon')]} className="row-upper" />
         <CapturedRow groups={[pi]} className="row-pi" />
@@ -142,20 +147,43 @@ function Game({ state, send }) {
 
   if (state.phase === 'over') {
     const r = state.result;
+    const winnerName = r.winner === 'player' ? '내' : 'AI의';
     return (
       <div className="screen over-screen">
         <h2 className="over-title">{state.message}</h2>
         {r.winner && (
-          <p className="breakdown">
-            기본 {r.base}점{r.goCount > 0 && ` · ${r.goCount}고`}
-            {r.pibak && ' · 피박 ×2'}
-            {r.gwangbak && ' · 광박 ×2'} → <b>{r.total}점</b>
+          <p className="over-how">
+            {r.how === 'stop'
+              ? `${r.winner === 'player' ? '내가' : 'AI가'} 스톱을 선언했습니다`
+              : '모든 카드를 가져가서 끝났습니다'}
           </p>
         )}
-        <div className="final-scores">
-          <div><span>플레이어</span><b>{playerScore}점</b></div>
-          <div><span>AI</span><b>{aiScore}점</b></div>
-        </div>
+
+        <CapturedPanel title="AI" cards={state.captured.ai} score={aiScore} goCount={state.goCount.ai} />
+        <CapturedPanel title="플레이어" cards={state.captured.player} score={playerScore} goCount={state.goCount.player} />
+
+        {r.winner && (
+          <section className="payout" aria-label="득점 내역">
+            <h3>{winnerName} 득점 내역</h3>
+            <ul>
+              {r.items.map((item) => (
+                <li key={item.key}><span>{item.label}</span><b>+{item.points}</b></li>
+              ))}
+            </ul>
+            <div className="payout-line"><span>소계</span><b>{r.base}점</b></div>
+            {r.goCount > 0 && (
+              <div className="payout-line"><span>{r.goCount}고</span><b>{r.withGo}점</b></div>
+            )}
+            {r.pibak && (
+              <div className="payout-line"><span>피박 (상대 피 {r.loserPi}장)</span><b>×2</b></div>
+            )}
+            {r.gwangbak && (
+              <div className="payout-line"><span>광박 (상대 광 {r.loserGwang}장)</span><b>×2</b></div>
+            )}
+            <div className="payout-total"><span>합계</span><b>{r.total}점</b></div>
+          </section>
+        )}
+
         <div className="row">
           <button className="btn btn-primary" onClick={() => send({ type: 'START', difficulty: state.difficulty })}>
             <RotateCcw size={18} /> <span>다시 하기</span>
