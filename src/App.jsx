@@ -134,12 +134,18 @@ function ItemToast({ event }) {
   );
 }
 
-function SweepBurst({ event }) {
+// 보너스가 겹치면 가장 큰 연출 하나만 보여 준다 (폭탄 > 판쓸 > 쪽)
+const BURST_TITLE = { bomb: '💣 폭탄!', sweep: '🧹 판쓸!', jjok: '💋 쪽!' };
+const burstKindOf = (event) => ['bomb', 'sweep', 'jjok'].find((k) => event.rewards.some((r) => r.kind === k)) ?? 'sweep';
+function RewardBurst({ event }) {
+  const kind = burstKindOf(event);
   return (
-    <div className={`sweep-burst ${event.who === 'player' ? 'mine' : 'theirs'}`} aria-hidden="true">
+    <div className={`sweep-burst burst-${kind} ${event.who === 'player' ? 'mine' : 'theirs'}`} aria-hidden="true">
       <div className="sweep-flash" />
       <div className="sweep-wipe" />
-      <div className="sweep-title">🧹 판쓸!</div>
+      <div className="burst-ring" />
+      <div className="burst-ring r2" />
+      <div className="sweep-title">{BURST_TITLE[kind]}</div>
       <div className="sweep-sparks">
         {Array.from({ length: 28 }, (_, i) => <i key={i} style={{ '--i': i }} />)}
       </div>
@@ -247,8 +253,8 @@ function useGameSounds(state) {
 
     const rewarded = state.rewardEvent && state.rewardEvent.n !== (p.rewardEvent?.n ?? 0);
     if (rewarded) {
-      const isSweep = state.rewardEvent.rewards.some((r) => r.kind === 'sweep');
-      later(isSweep ? 120 : 250, isSweep ? 'sweep' : 'itemPop');
+      const kind = burstKindOf(state.rewardEvent);
+      later(kind === 'sweep' ? 120 : 150, kind);
     }
     if (itemUsed) audio.play(state.itemEvent.item);
     else if (state.flipped.length > p.flipped.length) audio.play('flip');
@@ -467,7 +473,7 @@ function Game({ state, send }) {
       <CapturedPanel who="ai" title="AI" cards={state.captured.ai} score={aiScore} goCount={state.goCount.ai} active={state.turn === 'ai'} />
 
       {state.itemEvent && toastN === state.itemEvent.n && <ItemToast event={state.itemEvent} />}
-      {state.rewardEvent && rewardToastN === state.rewardEvent.n && state.rewardEvent.rewards.some((r) => r.kind === 'sweep') && <SweepBurst event={state.rewardEvent} />}
+      {state.rewardEvent && rewardToastN === state.rewardEvent.n && <RewardBurst event={state.rewardEvent} />}
       {state.rewardEvent && rewardToastN === state.rewardEvent.n && <SweepToast event={state.rewardEvent} />}
 
       <div className={`board-wrap ${peekPhase === 'show' ? 'peeking' : ''}`}>

@@ -132,6 +132,19 @@ export const SFX = {
     [72, 76, 79, 84, 88].forEach((n, i) => tone(ctx, out, t + 0.2 + i * 0.07, { freq: midi(n), type: 'triangle', dur: 0.6, vol: 0.17 }));
     [1568, 2093].forEach((f, i) => tone(ctx, out, t + 0.6 + i * 0.08, { freq: f, type: 'sine', dur: 0.5, vol: 0.12 }));
   },
+  // 쪽: 가볍게 "쪽!" 하는 입맞춤 소리 + 반짝
+  jjok: (ctx, out, t) => {
+    tone(ctx, out, t, { freq: 900, slideTo: 1500, type: 'sine', dur: 0.09, vol: 0.2 });
+    noise(ctx, out, t, { dur: 0.05, vol: 0.12, type: 'highpass', freq: 5000 });
+    [midi(88), midi(95)].forEach((f, i) => tone(ctx, out, t + 0.12 + i * 0.08, { freq: f, type: 'sine', dur: 0.35, vol: 0.14 }));
+  },
+  // 폭탄: 쿵 하는 폭발 + 낮게 울리는 잔향
+  bomb: (ctx, out, t) => {
+    tone(ctx, out, t, { freq: 120, slideTo: 38, type: 'sine', dur: 0.7, vol: 0.4 });
+    noise(ctx, out, t, { dur: 0.6, vol: 0.32, type: 'lowpass', freq: 1800, freqEnd: 120 });
+    noise(ctx, out, t, { dur: 0.12, vol: 0.2, type: 'highpass', freq: 3000 });
+    [midi(55), midi(62)].forEach((f, i) => tone(ctx, out, t + 0.25 + i * 0.1, { freq: f, type: 'sawtooth', dur: 0.6, vol: 0.07 }));
+  },
   gostop: (ctx, out, t) => {
     bell(ctx, out, t, { freq: 440, dur: 1.4, vol: 0.2 });
     drum(ctx, out, t, { low: true, vol: 0.3 });
