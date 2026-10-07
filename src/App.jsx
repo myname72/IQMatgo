@@ -89,10 +89,8 @@ function Menu({ onStart }) {
         <p>• 모든 카드를 가져갔는데 {WIN_THRESHOLD}점 이상이 없으면 나가리(무승부)</p>
       </div>
       <p className="credits">
-        카드 그림: Spenĉjo,{' '}
-        <a href="https://commons.wikimedia.org/wiki/Category:SVG_Hwatu" target="_blank" rel="noreferrer">Wikimedia Commons</a>,{' '}
-        <a href="https://creativecommons.org/licenses/by-sa/4.0/deed.ko" target="_blank" rel="noreferrer">CC BY-SA 4.0</a>
-        {' '}(크기 변환 및 WebP로 변환)
+        카드 그림 출처:{' '}
+        <a href="https://namu.wiki/w/%ED%99%94%ED%88%AC/%ED%8C%A8" target="_blank" rel="noreferrer">나무위키 「화투/패」</a>
       </p>
     </div>
   );
