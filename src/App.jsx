@@ -1,8 +1,7 @@
 import { useEffect, useReducer } from 'react';
 import { RotateCcw, Trophy, Hand } from 'lucide-react';
 import CardFace from './components/CardFace.jsx';
-import { summarize, WIN_THRESHOLD } from './game/scoring.js';
-import { KIND_LABEL, ribbonLabel } from './game/cards.js';
+import { WIN_THRESHOLD } from './game/scoring.js';
 import {
   gameReducer,
   createGame,
@@ -29,45 +28,35 @@ function hash01(seed, i, k) {
   return (x >>> 0) / 2 ** 32;
 }
 
-function CapturedPanel({ title, cards, score, goCount }) {
-  const s = summarize(cards);
-  const groups = [
-    ['gwang', s.gwang],
-    ['animal', s.animals],
-    ['ribbon', s.ribbons],
-    ['pi', cards.filter((c) => c.kind === 'pi' || c.kind === 'ssangpi')],
-  ];
-  const tags = [
-    s.godori && '고도리',
-    s.hongdan && '홍단',
-    s.cheongdan && '청단',
-    s.chodan && '초단',
-  ].filter(Boolean);
+// 먹은 패: 1줄에 광·열끗·띠, 2줄에 피. 줄 안에서는 겹쳐서 쌓는다.
+function CapturedRow({ cards, className }) {
   return (
-    <section className="captured">
+    <div className={`captured-row ${className}`} style={{ '--n': Math.max(cards.length, 2) }}>
+      {cards.map((c) => (
+        <div className="mini" key={c.id} title={c.name}>
+          <CardFace card={c} />
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function CapturedPanel({ title, cards, score, goCount }) {
+  const upper = [
+    ...cards.filter((c) => c.kind === 'gwang'),
+    ...cards.filter((c) => c.kind === 'animal'),
+    ...cards.filter((c) => c.kind === 'ribbon'),
+  ];
+  const pi = cards.filter((c) => c.kind === 'pi' || c.kind === 'ssangpi');
+  return (
+    <section className="captured" aria-label={`${title}이(가) 먹은 패`}>
       <header>
         <strong>{title}</strong>
         <span className="captured-score">{score}점{goCount > 0 && ` · ${goCount}고`}</span>
       </header>
-      <div className="captured-counts">
-        광 {s.gwang.length} · 열끗 {s.animals.length} · 띠 {s.ribbons.length} · 피 {s.piCount}
-        {tags.length > 0 && <span className="tags"> ✦ {tags.join(' ')}</span>}
-      </div>
-      <div className="captured-groups">
-        {groups.map(([kind, list]) =>
-          list.length > 0 && (
-            <div className="captured-group" key={kind}>
-              <span className="group-label">{KIND_LABEL[kind]}</span>
-              <div className="captured-cards">
-                {list.map((c) => (
-                  <div className="mini" key={c.id} title={`${c.name} (${KIND_LABEL[c.kind]}${c.ribbon ? ' · ' + ribbonLabel(c.ribbon) : ''})`}>
-                    <CardFace card={c} compact />
-                  </div>
-                ))}
-              </div>
-            </div>
-          ),
-        )}
+      <div className="captured-rows">
+        <CapturedRow cards={upper} className="row-upper" />
+        <CapturedRow cards={pi} className="row-pi" />
       </div>
     </section>
   );
