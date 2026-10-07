@@ -102,6 +102,9 @@ describe('게임 진행', () => {
     expect(g.phase).toBe('playing');
     expect(g.goCount.player).toBe(1);
     expect(g.lastGoScore.player).toBe(9);
+    expect(g.turn).toBe('ai'); // 고를 부르면 상대 차례
+    expect(g.tries).toBe(0);
+    g = { ...g, turn: 'player' }; // 이어지는 검증을 위해 되돌린다
     g.captured.ai = byName('비광'); // 광박 방지
     const stop = declareStop({ ...g, phase: 'gostop' });
     expect(stop.phase).toBe('over');
@@ -333,5 +336,29 @@ describe('아이템 패', () => {
     g = resolveFlip(flipCard(flipCard(g, pair[0]), pair[1]));
     expect(g.phase).toBe('over');
     expect(g.deck.some((s) => !s.taken && s.card.kind === 'item')).toBe(true);
+  });
+
+  it('고: 상대 차례로 넘어가고, 열려 있던 카드의 남은 턴이 줄어든다', () => {
+    let g = createGame('easy');
+    g.captured.player = fill('gwang', 5);
+    const m = (n) => g.deck.findIndex((s) => s.card.month === n);
+    g = { ...g, phase: 'gostop', revealed: [m(6)], revealLeft: { [m(6)]: 3 }, tries: 1 };
+    g = declareGo(g);
+    expect(g.turn).toBe('ai');
+    expect(g.tries).toBe(0);
+    expect(g.revealLeft[m(6)]).toBe(2);
+  });
+
+  it('아이템으로 고/스톱이 되어 고를 부르면, 고른 카드는 덮이고 상대 차례가 된다', () => {
+    let g = createGame('normal');
+    g.captured.player = fill('gwang', 5);
+    const a = g.deck.findIndex((s) => s.card.month === 6);
+    g = flipCard(g, a); // 짝 맞추는 도중
+    g = flipCard(g, g.deck.findIndex((s) => s.card.item === 'ssangpi')); // 쌍피 → 고/스톱
+    expect(g.phase).toBe('gostop');
+    g = declareGo(g);
+    expect(g.flipped).toEqual([]);
+    expect(g.lastHidden).toContain(a);
+    expect(g.turn).toBe('ai');
   });
 });

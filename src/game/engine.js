@@ -285,16 +285,26 @@ function endTurnIfOutOfTries(state) {
   };
 }
 
+// 고: 점수를 키워 두고 상대 차례로 넘어간다.
+// 짝을 맞추는 도중(첫 카드만 고른 상태)에 아이템으로 고/스톱이 된 경우, 고른 카드는 도로 덮는다.
 export function declareGo(state) {
   if (state.phase !== 'gostop') return state;
   const who = state.turn;
-  return endTurnIfOutOfTries({
+  const { revealed, revealLeft, hidden } = tickReveal(state); // 턴이 넘어가므로 열린 카드의 남은 턴도 줄어든다
+  const goCount = state.goCount[who] + 1;
+  return {
     ...state,
     phase: 'playing',
-    goCount: { ...state.goCount, [who]: state.goCount[who] + 1 },
+    goCount: { ...state.goCount, [who]: goCount },
     lastGoScore: { ...state.lastGoScore, [who]: scoreOf(state, who) },
-    message: `${whoLabel(who)}이(가) ${state.goCount[who] + 1}고를 불렀습니다! 계속 진행합니다.`,
-  });
+    flipped: [],
+    revealed,
+    revealLeft,
+    lastHidden: [...hidden, ...state.flipped],
+    turn: other(who),
+    tries: 0,
+    message: `${whoLabel(who)}이(가) ${goCount}고를 불렀습니다! ${who === 'player' ? 'AI' : '당신'}의 차례입니다.`,
+  };
 }
 
 export function declareStop(state) {
