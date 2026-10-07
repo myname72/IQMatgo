@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { HWATU_CARDS } from './cards.js';
 import { calculateScore, applyGo, finalPayout } from './scoring.js';
-import { MAX_TRIES, createGame, flipCard, resolveFlip, declareGo, declareStop, aiChooseFlip, scoreOf } from './engine.js';
+import { REVEAL_LIMIT, MAX_TRIES, createGame, flipCard, resolveFlip, declareGo, declareStop, aiChooseFlip, scoreOf } from './engine.js';
 
 const byName = (...names) => names.map((n) => HWATU_CARDS.find((c) => c.name === n));
 const fill = (kind, n) => HWATU_CARDS.filter((c) => c.kind === kind).slice(0, n);
@@ -133,5 +133,42 @@ describe('게임 진행', () => {
     }
     expect(g.turn).toBe('ai');
     expect(g.tries).toBe(0);
+  });
+  it('쉬움: 틀린 카드는 최근 6장까지만 앞면으로 유지된다', () => {
+    let g = createGame('easy');
+    expect(REVEAL_LIMIT.easy).toBe(6);
+    const miss = (a, b) => {
+      g = resolveFlip(flipCard(flipCard(g, a), b));
+      g = { ...g, turn: 'player', tries: 0 }; // 연속 시도 시험용
+    };
+    // 월이 서로 다른 카드 8장 (0..7이 아니라 월별 첫 카드)
+    const firsts = [1, 2, 3, 4, 5, 6, 7, 8].map((m) => g.deck.findIndex((s) => s.card.month === m));
+    miss(firsts[0], firsts[1]);
+    miss(firsts[2], firsts[3]);
+    miss(firsts[4], firsts[5]);
+    expect(g.revealed).toEqual(firsts.slice(0, 6));
+    miss(firsts[6], firsts[7]);
+    expect(g.revealed).toEqual(firsts.slice(2, 8)); // 가장 오래된 2장이 뒤집힌다
+  });
+  it('쉬움: 앞면 카드 2장을 골라 짝을 맞출 수 있고 유지 목록에서 빠진다', () => {
+    let g = createGame('easy');
+    const month = (m) => g.deck.map((s, i) => (s.card.month === m ? i : -1)).filter((i) => i >= 0);
+    const [a1, a2] = month(1);
+    const b1 = month(2)[0];
+    const c1 = month(3)[0];
+    g = resolveFlip(flipCard(flipCard(g, a1), b1)); // 틀림: a1,b1 공개
+    g = resolveFlip(flipCard(flipCard({ ...g, turn: 'player' }, a2), c1)); // 틀림: a2,c1 공개
+    g = { ...g, turn: 'player', tries: 0 };
+    g = resolveFlip(flipCard(flipCard(g, a1), a2)); // 공개된 두 장으로 짝 성공
+    expect(g.captured.player).toHaveLength(2);
+    expect(g.revealed).not.toContain(a1);
+    expect(g.revealed).not.toContain(a2);
+  });
+  it('보통/어려움은 틀린 카드를 유지하지 않는다', () => {
+    let g = createGame('normal');
+    const i = g.deck.findIndex((s) => s.card.month === 1);
+    const j = g.deck.findIndex((s) => s.card.month === 2);
+    g = resolveFlip(flipCard(flipCard(g, i), j));
+    expect(g.revealed).toEqual([]);
   });
 });

@@ -76,3 +76,5 @@ body {
 .final-scores { display: flex; gap: 3rem; background: rgba(255,255,255,0.1); padding: 1.5rem 3rem; border-radius: 20px; }
 .final-scores div { display: flex; flex-direction: column; gap: 0.3rem; }
 .final-scores b { font-size: 2rem; }
+
+.card.selected .card-front { outline: 3px solid #ffd700; outline-offset: -3px; }

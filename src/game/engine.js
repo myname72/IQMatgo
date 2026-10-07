@@ -4,6 +4,9 @@ import { calculateScore, finalPayout, WIN_THRESHOLD } from './scoring.js';
 // AI가 기억하는 카드 수 (난이도)
 export const MEMORY_LIMIT = { easy: 4, normal: 8, hard: 14 };
 
+// 틀린 카드를 앞면으로 유지하는 장수 (쉬움에서만)
+export const REVEAL_LIMIT = { easy: 6, normal: 0, hard: 0 };
+
 // 한 턴에 시도할 수 있는 최대 횟수 (2장 뒤집기 = 1회, 맞춰도 횟수는 소모)
 export const MAX_TRIES = 4;
 
@@ -18,6 +21,7 @@ export function createGame(difficulty, rng = Math.random) {
     turn: 'player',
     tries: 0, // 이번 턴에 사용한 시도 횟수
     captured: { player: [], ai: [] },
+    revealed: [], // 틀린 뒤에도 앞면으로 남아 있는 카드 위치 (오래된 것부터)
     memory: [], // 최근에 공개된 (아직 남아있는) 카드 위치
     goCount: { player: 0, ai: 0 },
     lastGoScore: { player: 0, ai: 0 },
@@ -40,6 +44,7 @@ function remember(state, index) {
 export function flipCard(state, index) {
   const slot = state.deck[index];
   if (state.phase !== 'playing' || !slot || slot.taken) return state;
+  // 앞면으로 남아 있는(revealed) 카드도 다시 선택할 수 있다
   if (state.flipped.length >= 2 || state.flipped.includes(index)) return state;
   return {
     ...state,
@@ -94,9 +99,14 @@ export function resolveFlip(state) {
   const who = state.turn;
 
   if (a.month !== b.month) {
+    const limit = REVEAL_LIMIT[state.difficulty];
+    const revealed = limit
+      ? [...state.revealed.filter((k) => k !== i && k !== j), i, j].slice(-limit)
+      : [];
     return {
       ...state,
       flipped: [],
+      revealed,
       turn: other(who),
       tries: 0,
       message: who === 'player' ? '❌ 짝이 아닙니다. AI의 턴입니다.' : '당신의 턴입니다!',
@@ -109,6 +119,7 @@ export function resolveFlip(state) {
     deck,
     flipped: [],
     tries: state.tries + 1,
+    revealed: state.revealed.filter((k) => k !== i && k !== j),
     memory: state.memory.filter((k) => k !== i && k !== j),
     captured: { ...state.captured, [who]: [...state.captured[who], a, b] },
   };

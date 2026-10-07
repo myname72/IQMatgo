@@ -11,6 +11,7 @@ import {
   aiDecideGoStop,
   MEMORY_LIMIT,
   MAX_TRIES,
+  REVEAL_LIMIT,
 } from './game/engine.js';
 
 const DIFFICULTIES = [
@@ -65,13 +66,14 @@ function Menu({ onStart }) {
         {DIFFICULTIES.map((d) => (
           <button key={d.key} className={`btn ${d.cls}`} onClick={() => onStart(d.key)}>
             <span>{d.label}</span>
-            <small>(AI 기억력: {MEMORY_LIMIT[d.key]}장)</small>
+            <small>(AI 기억력: {MEMORY_LIMIT[d.key]}장{REVEAL_LIMIT[d.key] > 0 && ` · 틀린 카드 ${REVEAL_LIMIT[d.key]}장 유지`})</small>
           </button>
         ))}
       </div>
       <div className="rules">
         <h3>게임 규칙</h3>
         <p>• 화투 48장 중 같은 월 2장을 뒤집어 맞추면 가져가고 한 번 더 뒤집을 수 있습니다. 틀리거나, 한 턴에 4번(맞춰도 횟수 소모)을 모두 쓰면 상대 차례입니다.</p>
+        <p>• 쉬움 난이도에서는 틀린 카드가 최근 6장까지 앞면으로 남아 있고, 앞면인 카드도 다시 골라 짝을 맞출 수 있습니다.</p>
         <p>• 광 3점(비광 포함 2점)·4광 4점·5광 15점, 고도리 5점, 홍단·청단·초단 각 3점</p>
         <p>• 열끗·띠는 5장부터 1점(이후 1장당 +1), 피는 10장부터 1점(쌍피는 2장으로 계산)</p>
         <p>• {WIN_THRESHOLD}점 이상이 되면 <b>고</b>(계속) 또는 <b>스톱</b>(종료)을 선택합니다. 고를 부른 뒤에는 점수가 더 올라야 다시 선택할 수 있습니다.</p>
@@ -169,14 +171,15 @@ function Game({ state, send }) {
 
       <div className="cards-grid">
         {state.deck.map((slot, index) => {
-          const faceUp = slot.taken || state.flipped.includes(index);
+          const selected = state.flipped.includes(index);
+          const faceUp = slot.taken || selected || state.revealed.includes(index);
           return (
             <button
               key={slot.card.id}
               type="button"
-              className={`card ${faceUp ? 'flipped' : ''} ${slot.taken ? 'taken' : ''}`}
+              className={`card ${faceUp ? 'flipped' : ''} ${slot.taken ? 'taken' : ''} ${selected ? 'selected' : ''}`}
               onClick={() => send({ type: 'FLIP', index })}
-              disabled={!canClick || slot.taken || faceUp}
+              disabled={!canClick || slot.taken || selected}
               aria-label={faceUp ? `${slot.card.month}월 ${slot.card.name}` : '뒤집지 않은 카드'}
             >
               <span className="card-inner">
