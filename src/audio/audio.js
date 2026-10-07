@@ -94,8 +94,10 @@ export function unlock() {
   const go = () => {
     if (settings.music) startMusic();
   };
-  if (c.state === 'suspended') c.resume().then(go).catch(() => {});
-  else go();
+  if (c.state !== 'running') {
+    backgrounded = false;
+    c.resume().then(go).catch(() => {});
+  } else go();
 }
 
 export function play(name) {
@@ -125,19 +127,46 @@ export function setSfx(on) {
   emit();
 }
 
-// 탭이 가려지면 소리와 계산을 멈춘다
+// ---- 앱이 화면에서 사라지면(홈 화면, 다른 앱·탭) 소리를 멈추고, 돌아오면 이어서 낸다 ----
+// 브라우저 알림(visibilitychange 등)이 오지 않는 앱 내부 화면에서도 멈추도록,
+// 화면 그리기(requestAnimationFrame)가 멈추는지도 함께 살핀다.
+let backgrounded = false;
+let lastFrame = typeof performance !== 'undefined' ? performance.now() : 0;
+
+function suspendForBackground() {
+  if (!ctx || backgrounded) return;
+  backgrounded = true;
+  ctx.suspend().catch(() => {});
+}
+function resumeFromBackground() {
+  if (!ctx || !backgrounded) return;
+  backgrounded = false;
+  ctx.resume().catch(() => {});
+}
+
 if (typeof document !== 'undefined') {
-  document.addEventListener('visibilitychange', () => {
-    if (!ctx) return;
-    if (document.hidden) ctx.suspend().catch(() => {});
-    else ctx.resume().catch(() => {});
-  });
+  document.addEventListener('visibilitychange', () => (document.hidden ? suspendForBackground() : resumeFromBackground()));
+  window.addEventListener('pagehide', suspendForBackground);
+  window.addEventListener('pageshow', resumeFromBackground);
+  document.addEventListener('freeze', suspendForBackground);
+  document.addEventListener('resume', resumeFromBackground);
+  const frame = () => {
+    lastFrame = performance.now();
+    if (backgrounded && !document.hidden) resumeFromBackground(); // 그리기가 다시 시작됨 = 돌아옴
+    requestAnimationFrame(frame);
+  };
+  requestAnimationFrame(frame);
+  // 소리가 나는 동안에는 타이머가 느려지지 않으므로, 그리기가 1.5초 넘게 멈추면 화면에서 사라진 것으로 본다
+  setInterval(() => {
+    if (ctx && !backgrounded && performance.now() - lastFrame > 1500) suspendForBackground();
+  }, 500);
 }
 
 // 확인용: ?audiotest 로 열면 오프라인으로 소리를 만들어 크기를 잰다
 if (typeof window !== 'undefined' && /[?&]audiotest/.test(window.location.search)) {
   window.__iqAudio = {
     state: () => ctx?.state ?? 'none',
+    backgrounded: () => backgrounded,
     async measure(name, seconds = 2.5) {
       const off = new OfflineAudioContext(1, Math.floor(44100 * seconds), 44100);
       const g = off.createGain();
