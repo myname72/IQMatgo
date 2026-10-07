@@ -37,15 +37,50 @@ const SPEC = [
 
 const GODORI_MONTHS = [2, 4, 8]; // 매조, 흑싸리새, 기러기
 
-export const HWATU_CARDS = SPEC.map(([month, kind, ribbon, name], i) => ({
+const EN_MONTH = [
+  'January', 'February', 'March', 'April', 'May', 'June',
+  'July', 'August', 'September', 'October', 'November', 'December',
+];
+
+// 카드 이미지 파일 이름 (src/assets/cards/<imageKey>.webp)
+// Wikimedia Commons "Hwatu <Month> <Hikari|Tane|Tanzaku|Kasu N>.svg" 에 대응한다.
+// 11월(오동)은 Kasu 3장 중 하나가 쌍피다.
+const NOV_SSANGPI_KASU = 3; // TODO: 이미지 확인 후 확정
+function imageKeyOf(month, kind, kasuNo) {
+  const m = EN_MONTH[month - 1];
+  if (kind === 'gwang') return `${m}_Hikari`;
+  if (kind === 'animal') return `${m}_Tane`;
+  if (kind === 'ribbon') return `${m}_Tanzaku`;
+  if (month === 12) return `${m}_Kasu`; // 비쌍피
+  return `${m}_Kasu_${kasuNo}`;
+}
+
+// 11월: 쌍피는 NOV_SSANGPI_KASU 번, 나머지 피 2장이 남은 번호를 차지한다.
+function kasuNumber(month, kind, seenInMonth) {
+  if (month === 11) {
+    if (kind === 'ssangpi') return NOV_SSANGPI_KASU;
+    const rest = [1, 2, 3].filter((n) => n !== NOV_SSANGPI_KASU);
+    return rest[seenInMonth.pi++];
+  }
+  return ++seenInMonth.kasu;
+}
+
+const seen = {};
+export const HWATU_CARDS = SPEC.map(([month, kind, ribbon, name], i) => {
+  const st = (seen[month] ??= { kasu: 0, pi: 0 });
+  const isKasu = kind === 'pi' || kind === 'ssangpi';
+  const kasuNo = isKasu ? kasuNumber(month, kind, st) : 0;
+  return {
   id: i + 1,
+  imageKey: imageKeyOf(month, kind, kasuNo),
   month,
   kind,
   ribbon,
   name,
   godori: kind === 'animal' && GODORI_MONTHS.includes(month),
   piValue: kind === 'ssangpi' ? 2 : kind === 'pi' ? 1 : 0,
-}));
+  };
+});
 
 export const KIND_LABEL = {
   gwang: '광',

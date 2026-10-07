@@ -45,8 +45,8 @@ body {
 .captured-group { display: flex; flex-direction: column; gap: 2px; min-width: 0; max-width: 100%; }
 .group-label { font-size: 0.75rem; opacity: 0.7; }
 .captured-cards { display: flex; flex-wrap: wrap; row-gap: 4px; padding-right: 30px; min-width: 0; }
-.mini { width: 64px; aspect-ratio: 5 / 7; border-radius: 5px; overflow: hidden; margin-right: -32px; box-shadow: 0 1px 4px rgba(0,0,0,0.5); }
-.mini .card-svg { display: block; }
+.mini { width: 64px; aspect-ratio: 103.2 / 168.2; border-radius: 5px; overflow: hidden; margin-right: -32px; box-shadow: 0 1px 4px rgba(0,0,0,0.5); }
+
 
 /* 판: 뒷면 카드만 작게, 칸마다 살짝 어긋나게 흩어 놓는다 */
 .cards-grid {
@@ -55,7 +55,7 @@ body {
   background: rgba(0,0,0,0.18); border-radius: 12px;
 }
 @media (min-width: 700px) { .cards-grid { grid-template-columns: repeat(12, 1fr); gap: 8px; padding: 10px; } }
-.slot { aspect-ratio: 5 / 7; position: relative; }
+.slot { aspect-ratio: 103.2 / 168.2; position: relative; }
 .back-card {
   all: unset; position: absolute; inset: 0; border-radius: 5px; cursor: pointer;
   background: linear-gradient(135deg, #2d3561, #1f2544); border: 2px solid #4e5d94;
@@ -76,14 +76,14 @@ body {
 
 /* 열려 있는 카드: 크게 */
 .tray {
-  width: 100%; max-width: 1100px; min-height: calc(88px * 1.4 + 12px);
+  width: 100%; max-width: 1100px; min-height: calc(88px * 1.63 + 12px);
   display: flex; flex-wrap: wrap; justify-content: center; align-content: flex-start; gap: 8px;
   padding: 6px; border-radius: 12px; background: rgba(255,215,0,0.06); border: 1px dashed rgba(255,215,0,0.25);
 }
 /* 판은 트레이 위에 있으므로 트레이가 늘어나도 판의 위치는 바뀌지 않는다 */
 .tray-empty { width: 100%; align-self: center; text-align: center; font-size: 0.85rem; opacity: 0.55; }
 .tray-card {
-  all: unset; display: block; width: clamp(72px, 21vw, 88px); aspect-ratio: 5 / 7; border-radius: 8px; overflow: hidden; cursor: pointer;
+  all: unset; display: block; width: clamp(72px, 21vw, 88px); aspect-ratio: 103.2 / 168.2; border-radius: 8px; overflow: hidden; cursor: pointer;
   box-shadow: 0 4px 12px rgba(0,0,0,0.5); animation: pop 0.25s ease-out; box-sizing: border-box;
 }
 .tray-card:disabled { cursor: default; }
@@ -91,10 +91,10 @@ body {
 .tray-card:focus-visible { outline: 3px solid #ffd700; }
 .tray-card { position: relative; }
 .tray-card.dropping { opacity: 0.78; }
-.drop-badge { position: absolute; left: 4px; right: 4px; bottom: 22px; padding: 2px 0; text-align: center; font: 700 0.65rem 'Noto Serif KR', serif; color: #1a1a2e; background: #ffd700; border-radius: 4px; }
+.drop-badge { position: absolute; left: 4px; right: 4px; bottom: 6px; padding: 2px 0; text-align: center; font: 700 0.65rem 'Noto Serif KR', serif; color: #1a1a2e; background: #ffd700; border-radius: 4px; }
 .tray-card.selected { outline: 3px solid #ffd700; outline-offset: -3px; }
 @keyframes pop { from { transform: scale(0.6); opacity: 0; } to { transform: scale(1); opacity: 1; } }
-.card-svg { width: 100%; height: 100%; display: block; }
+.card-img { width: 100%; height: 100%; display: block; object-fit: contain; user-select: none; -webkit-user-drag: none; }
 @media (prefers-reduced-motion: reduce) { .tray-card { animation: none; } }
 
 @media (max-width: 480px) {
@@ -113,3 +113,7 @@ body {
 .final-scores b { font-size: 2rem; }
 
 .card.selected .card-front { outline: 3px solid #ffd700; outline-offset: -3px; }
+
+.credits { font-size: 0.75rem; opacity: 0.6; max-width: 640px; text-align: center; }
+.credits a { color: inherit; }
+.card-fallback { width: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; color: #fff; font-size: 0.7rem; text-align: center; }
