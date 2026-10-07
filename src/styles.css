@@ -305,3 +305,17 @@ html, body { overflow-x: clip; }
 .sweep-toast { border-color: #7ee0a0; top: calc(env(safe-area-inset-top, 0px) + 140px); }
 .sweep-toast strong { color: #7ee0a0; }
 .sweep-emoji { flex: none; font-size: 2.2rem; width: 56px; text-align: center; }
+
+/* 판쓸 연출 */
+.sweep-burst { position: fixed; inset: 0; z-index: 30; pointer-events: none; overflow: hidden; }
+.sweep-flash { position: absolute; inset: 0; background: radial-gradient(circle at 50% 45%, rgba(255,236,150,0.85), rgba(255,200,60,0.25) 45%, transparent 70%); animation: sweep-flash 0.9s ease-out forwards; }
+.sweep-wipe { position: absolute; top: 0; bottom: 0; width: 38%; left: -45%; background: linear-gradient(100deg, transparent, rgba(255,255,255,0.55), rgba(255,226,120,0.8), transparent); transform: skewX(-14deg); filter: blur(6px); animation: sweep-wipe 0.75s cubic-bezier(0.4, 0, 0.2, 1) forwards; }
+.sweep-burst.theirs .sweep-wipe { animation-direction: reverse; left: 110%; animation-name: sweep-wipe-rev; }
+.sweep-title { position: absolute; left: 50%; top: 42%; transform: translate(-50%, -50%) scale(0.2) rotate(-8deg); font-size: clamp(3rem, 16vw, 6rem); font-weight: 900; color: #fff6c8; white-space: nowrap; letter-spacing: 0.04em; text-shadow: 0 0 18px #ffb800, 0 0 42px #ff7a00, 0 4px 0 #b3541a, 0 8px 18px rgba(0,0,0,0.6); animation: sweep-title 2.1s cubic-bezier(0.2, 1.4, 0.4, 1) forwards; }
+.sweep-sparks i { position: absolute; left: 50%; top: 42%; width: 10px; height: 10px; border-radius: 50%; background: hsl(calc(var(--i) * 37), 95%, 62%); opacity: 0; animation: sweep-spark 1.5s ease-out calc(var(--i) * 0.012s) forwards; --a: calc(var(--i) * 12.86deg); --d: calc(90px + (var(--i) % 5) * 38px); }
+@keyframes sweep-flash { 0% { opacity: 0; } 15% { opacity: 1; } 100% { opacity: 0; } }
+@keyframes sweep-wipe { from { left: -45%; } to { left: 115%; } }
+@keyframes sweep-wipe-rev { from { left: 115%; } to { left: -45%; } }
+@keyframes sweep-title { 0% { transform: translate(-50%, -50%) scale(0.2) rotate(-8deg); opacity: 0; } 22% { transform: translate(-50%, -50%) scale(1.25) rotate(2deg); opacity: 1; } 34% { transform: translate(-50%, -50%) scale(1) rotate(0); } 80% { opacity: 1; } 100% { transform: translate(-50%, -62%) scale(1.05); opacity: 0; } }
+@keyframes sweep-spark { 0% { opacity: 1; transform: translate(-50%, -50%) rotate(var(--a)) translateX(0) scale(1); } 100% { opacity: 0; transform: translate(-50%, -50%) rotate(var(--a)) translateX(var(--d)) scale(0.3); } }
+@media (prefers-reduced-motion: reduce) { .sweep-wipe, .sweep-sparks { display: none; } }

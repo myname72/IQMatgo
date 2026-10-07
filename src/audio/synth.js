@@ -125,6 +125,13 @@ export const SFX = {
     SFX.itemPop(ctx, out, t);
     [88, 91, 95, 100].forEach((n, i) => tone(ctx, out, t + 0.3 + i * 0.08, { freq: midi(n), type: 'sine', dur: 0.5, vol: 0.1, detune: i % 2 ? 6 : -6 }));
   },
+  // 판쓸: 쓸어내는 바람 소리 + 올라가는 팡파르 + 북
+  sweep: (ctx, out, t) => {
+    noise(ctx, out, t, { dur: 0.55, vol: 0.2, type: 'bandpass', freq: 400, freqEnd: 6000, q: 0.9 });
+    drum(ctx, out, t + 0.05, { low: true, vol: 0.3 });
+    [72, 76, 79, 84, 88].forEach((n, i) => tone(ctx, out, t + 0.2 + i * 0.07, { freq: midi(n), type: 'triangle', dur: 0.6, vol: 0.17 }));
+    [1568, 2093].forEach((f, i) => tone(ctx, out, t + 0.6 + i * 0.08, { freq: f, type: 'sine', dur: 0.5, vol: 0.12 }));
+  },
   gostop: (ctx, out, t) => {
     bell(ctx, out, t, { freq: 440, dur: 1.4, vol: 0.2 });
     drum(ctx, out, t, { low: true, vol: 0.3 });

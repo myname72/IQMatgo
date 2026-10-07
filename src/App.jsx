@@ -134,6 +134,19 @@ function ItemToast({ event }) {
   );
 }
 
+function SweepBurst({ event }) {
+  return (
+    <div className={`sweep-burst ${event.who === 'player' ? 'mine' : 'theirs'}`} aria-hidden="true">
+      <div className="sweep-flash" />
+      <div className="sweep-wipe" />
+      <div className="sweep-title">🧹 판쓸!</div>
+      <div className="sweep-sparks">
+        {Array.from({ length: 28 }, (_, i) => <i key={i} style={{ '--i': i }} />)}
+      </div>
+    </div>
+  );
+}
+
 function SweepToast({ event }) {
   const names = event.stolen.map((c) => c.name ?? '피').join(', ');
   return (
@@ -232,6 +245,11 @@ function useGameSounds(state) {
     const later = (ms, name) => timers.push(setTimeout(() => audio.play(name), ms));
     const itemUsed = state.itemEvent && state.itemEvent.n !== (p.itemEvent?.n ?? 0);
 
+    const rewarded = state.rewardEvent && state.rewardEvent.n !== (p.rewardEvent?.n ?? 0);
+    if (rewarded) {
+      const isSweep = state.rewardEvent.rewards.some((r) => r.kind === 'sweep');
+      later(isSweep ? 120 : 250, isSweep ? 'sweep' : 'itemPop');
+    }
     if (itemUsed) audio.play(state.itemEvent.item);
     else if (state.flipped.length > p.flipped.length) audio.play('flip');
     else if (total(state) > total(p)) audio.play('match');
@@ -340,7 +358,7 @@ function Game({ state, send }) {
       return undefined;
     }
     setRewardToastN(rewardN);
-    const id = setTimeout(() => setRewardToastN(0), 2200);
+    const id = setTimeout(() => setRewardToastN(0), 2600);
     return () => clearTimeout(id);
   }, [rewardN]);
 
@@ -449,6 +467,7 @@ function Game({ state, send }) {
       <CapturedPanel who="ai" title="AI" cards={state.captured.ai} score={aiScore} goCount={state.goCount.ai} active={state.turn === 'ai'} />
 
       {state.itemEvent && toastN === state.itemEvent.n && <ItemToast event={state.itemEvent} />}
+      {state.rewardEvent && rewardToastN === state.rewardEvent.n && state.rewardEvent.rewards.some((r) => r.kind === 'sweep') && <SweepBurst event={state.rewardEvent} />}
       {state.rewardEvent && rewardToastN === state.rewardEvent.n && <SweepToast event={state.rewardEvent} />}
 
       <div className={`board-wrap ${peekPhase === 'show' ? 'peeking' : ''}`}>
