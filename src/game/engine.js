@@ -22,7 +22,7 @@ const other = (who) => (who === 'player' ? 'ai' : 'player');
 // 시작할 때 판에 앞면으로 깔아 두는 카드 수 (먼저 시작하는 쪽이 불리하지 않도록 둘 다 본다)
 export const START_OPEN = 4;
 
-export function createGame(difficulty, rng = Math.random) {
+export function createGame(difficulty, rng = Math.random, first = 'player') {
   const dealt = shuffle([...HWATU_CARDS, ...ITEM_CARDS], rng).map((card) => ({ card, taken: false }));
   // 앞에서부터 일반 카드 4장이 깔릴 때까지 넘기고, 그 사이에 나온 아이템 패는 효과 없이 선(사람)이 먹는다
   // (쌍피·쓰리피는 피로 계산)
@@ -47,10 +47,11 @@ export function createGame(difficulty, rng = Math.random) {
     rngCount: 0, // 아이템 효과용 난수 (seed로부터 결정적으로 만든다)
     itemEvent: null, // 마지막으로 발동한 아이템 { n, who, item }
     flipped: [],
-    turn: 'player',
-    turnEvent: { n: 1, to: 'player', reason: 'start' },
+    turn: first,
+    turnEvent: { n: 1, to: first, reason: 'start' },
     tries: 0, // 이번 턴에 사용한 시도 횟수
-    captured: { player: startItems, ai: [] },
+    first, // 이번 판의 선
+    captured: first === 'player' ? { player: startItems, ai: [] } : { player: [], ai: startItems },
     lastHidden: [], // 방금 뒷면으로 돌아간 카드 위치 (판에서 반짝여 알려준다)
     revealed: startOpen, // 앞면으로 남아 있는 카드 위치 (시작 때 깔아 둔 카드 + 틀린 뒤 남은 카드)
     revealLeft: Object.fromEntries(startOpen.map((i) => [i, openTurns])), // 위치 -> 앞으로 앞면으로 남아 있을 턴 수
@@ -60,7 +61,7 @@ export function createGame(difficulty, rng = Math.random) {
     pendingTurnEnd: null,
     rewardEvent: null,
     bonus: { player: 0, ai: 0 },
-    message: `카드 ${START_OPEN}장이 앞면으로 깔려 있습니다. 당신의 턴입니다!`,
+    message: first === 'player' ? `카드 ${START_OPEN}장이 앞면으로 깔려 있습니다. 당신의 턴입니다!` : `카드 ${START_OPEN}장이 앞면으로 깔려 있습니다. AI가 먼저 시작합니다.`,
     result: null,
   };
 }
@@ -397,7 +398,7 @@ export function declareStop(state) {
 export function gameReducer(state, action) {
   switch (action.type) {
     case 'START':
-      return createGame(action.difficulty, action.rng);
+      return createGame(action.difficulty, action.rng, action.first);
     case 'FLIP':
       return flipCard(state, action.index);
     case 'RESOLVE':

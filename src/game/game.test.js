@@ -503,4 +503,12 @@ describe('아이템 패', () => {
     expect(g.rewardEvent.rewards.map((r) => r.kind)).toContain('bomb');
     expect(g.captured.ai).toHaveLength(2);
   });
+
+  it('선을 AI로 정하면 AI가 먼저 시작하고 시작 아이템도 AI가 먹는다', () => {
+    const g = createGame('normal', Math.random, 'ai');
+    expect(g.turn).toBe('ai');
+    expect(g.turnEvent).toMatchObject({ to: 'ai', reason: 'start' });
+    expect(g.captured.player).toHaveLength(0);
+    expect(g.revealed).toHaveLength(START_OPEN);
+  });
 });
