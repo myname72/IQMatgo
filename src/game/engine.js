@@ -23,6 +23,7 @@ export function createGame(difficulty, rng = Math.random) {
     turn: 'player',
     tries: 0, // 이번 턴에 사용한 시도 횟수
     captured: { player: [], ai: [] },
+    lastHidden: [], // 방금 뒷면으로 돌아간 카드 위치 (판에서 반짝여 알려준다)
     revealed: [], // 틀린 뒤에도 앞면으로 남아 있는 카드 위치 (오래된 것부터)
     memory: [], // 최근에 공개된 (아직 남아있는) 카드 위치
     goCount: { player: 0, ai: 0 },
@@ -105,10 +106,12 @@ export function resolveFlip(state) {
     const revealed = limit
       ? [...state.revealed.filter((k) => k !== i && k !== j), i, j].slice(-limit)
       : [];
+    const lastHidden = [...new Set([...state.revealed, i, j])].filter((k) => !revealed.includes(k));
     return {
       ...state,
       flipped: [],
       revealed,
+      lastHidden,
       turn: other(who),
       tries: 0,
       message: who === 'player' ? '❌ 짝이 아닙니다. AI의 턴입니다.' : '당신의 턴입니다!',
@@ -121,6 +124,7 @@ export function resolveFlip(state) {
     deck,
     flipped: [],
     tries: state.tries + 1,
+    lastHidden: [],
     revealed: state.revealed.filter((k) => k !== i && k !== j),
     memory: state.memory.filter((k) => k !== i && k !== j),
     captured: { ...state.captured, [who]: [...state.captured[who], a, b] },

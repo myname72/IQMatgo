@@ -179,4 +179,25 @@ describe('게임 진행', () => {
     g = { ...g, flipped: [month1[0]] };
     expect(aiChooseFlip(g)).toBe(month1[1]);
   });
+  it('쉬움: 6장을 넘어 뒷면으로 돌아간 카드를 lastHidden으로 알려준다', () => {
+    let g = createGame('easy');
+    const firsts = [1, 2, 3, 4, 5, 6, 7, 8].map((m) => g.deck.findIndex((s) => s.card.month === m));
+    const miss = (a, b) => {
+      g = resolveFlip(flipCard(flipCard(g, a), b));
+      g = { ...g, turn: 'player', tries: 0 };
+    };
+    miss(firsts[0], firsts[1]);
+    miss(firsts[2], firsts[3]);
+    miss(firsts[4], firsts[5]);
+    expect(g.lastHidden).toEqual([]);
+    miss(firsts[6], firsts[7]);
+    expect(g.lastHidden.sort()).toEqual([firsts[0], firsts[1]].sort());
+  });
+  it('보통: 틀린 두 장이 방금 뒷면으로 돌아간 카드로 표시된다', () => {
+    let g = createGame('normal');
+    const i = g.deck.findIndex((s) => s.card.month === 1);
+    const j = g.deck.findIndex((s) => s.card.month === 2);
+    g = resolveFlip(flipCard(flipCard(g, i), j));
+    expect(g.lastHidden.sort()).toEqual([i, j].sort());
+  });
 });

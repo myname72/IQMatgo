@@ -143,6 +143,10 @@ function Game({ state, send }) {
     ...state.revealed,
     ...state.flipped.filter((i) => !state.revealed.includes(i)),
   ];
+  // 다음에 틀리면 뒷면으로 돌아갈 카드 (가장 오래된 것부터)
+  const limit = REVEAL_LIMIT[state.difficulty];
+  const dropCount = limit ? Math.max(0, state.revealed.length + 2 - limit) : 0;
+  const dropping = new Set(state.revealed.filter((i) => !state.flipped.includes(i)).slice(0, dropCount));
   const canClick = state.phase === 'playing' && state.turn === 'player' && state.flipped.length < 2;
 
   if (state.phase === 'over') {
@@ -199,11 +203,17 @@ function Game({ state, send }) {
           return (
             <div className="slot" key={slot.card.id}>
               {slot.taken ? null : up ? (
-                <span className="ghost" aria-hidden="true" />
+                <span
+                  className={`slot-face ${selected ? 'selected' : ''}`}
+                  style={{ transform: `translate(${dx}px, ${dy}px) rotate(${rot}deg)` }}
+                  aria-hidden="true"
+                >
+                  <CardFace card={slot.card} compact />
+                </span>
               ) : (
                 <button
                   type="button"
-                  className="back-card"
+                  className={`back-card ${state.lastHidden.includes(index) ? 'returned' : ''}`}
                   style={{ transform: `translate(${dx}px, ${dy}px) rotate(${rot}deg)` }}
                   onClick={() => send({ type: 'FLIP', index })}
                   disabled={!canClick}
@@ -226,12 +236,13 @@ function Game({ state, send }) {
             <button
               key={card.id}
               type="button"
-              className={`tray-card ${selected ? 'selected' : ''}`}
+              className={`tray-card ${selected ? 'selected' : ''} ${dropping.has(index) ? 'dropping' : ''}`}
               onClick={() => send({ type: 'FLIP', index })}
               disabled={!canClick || selected}
               aria-label={`${card.month}월 ${card.name}`}
             >
               <CardFace card={card} />
+              {dropping.has(index) && <span className="drop-badge">곧 뒤집힘</span>}
             </button>
           );
         })}
