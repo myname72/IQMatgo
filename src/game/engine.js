@@ -23,8 +23,12 @@ const other = (who) => (who === 'player' ? 'ai' : 'player');
 export const START_OPEN = 4;
 
 export function createGame(difficulty, rng = Math.random) {
-  const deck = shuffle([...HWATU_CARDS, ...ITEM_CARDS], rng).map((card) => ({ card, taken: false }));
-  const startOpen = deck.map((d, i) => (isItem(d.card) ? -1 : i)).filter((i) => i >= 0).slice(0, START_OPEN);
+  const dealt = shuffle([...HWATU_CARDS, ...ITEM_CARDS], rng).map((card) => ({ card, taken: false }));
+  // 깔린 4장 중 아이템 카드는 효과 없이 선(사람)이 그냥 먹는다 (쌍피·쓰리피는 피로 계산)
+  const firstFour = dealt.slice(0, START_OPEN);
+  const startOpen = firstFour.map((d, i) => (isItem(d.card) ? -1 : i)).filter((i) => i >= 0);
+  const startItems = firstFour.filter((d) => isItem(d.card)).map((d) => d.card);
+  const deck = dealt.map((d, i) => (i < START_OPEN && isItem(d.card) ? { ...d, taken: true } : d));
   const openTurns = Math.max(REVEAL_TURNS[difficulty] ?? 0, 2); // 최소 한 사람당 한 턴은 볼 수 있다
   return {
     phase: 'playing', // playing | gostop | over
@@ -37,7 +41,7 @@ export function createGame(difficulty, rng = Math.random) {
     turn: 'player',
     turnEvent: { n: 1, to: 'player', reason: 'start' },
     tries: 0, // 이번 턴에 사용한 시도 횟수
-    captured: { player: [], ai: [] },
+    captured: { player: startItems, ai: [] },
     lastHidden: [], // 방금 뒷면으로 돌아간 카드 위치 (판에서 반짝여 알려준다)
     revealed: startOpen, // 앞면으로 남아 있는 카드 위치 (시작 때 깔아 둔 카드 + 틀린 뒤 남은 카드)
     revealLeft: Object.fromEntries(startOpen.map((i) => [i, openTurns])), // 위치 -> 앞으로 앞면으로 남아 있을 턴 수

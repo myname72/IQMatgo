@@ -7,7 +7,11 @@ const byName = (...names) => names.map((n) => HWATU_CARDS.find((c) => c.name ===
 const fill = (kind, n) => HWATU_CARDS.filter((c) => c.kind === kind).slice(0, n);
 
 // 시작할 때 깔리는 카드를 치우고 시작하는 테스트용 판
-const cleanGame = (d) => ({ ...createGame(d), revealed: [], revealLeft: {}, memory: [] });
+const cleanGame = (d) => {
+  const g = createGame(d);
+  // 시작 때 깔린 카드(와 선이 먹은 아이템)를 치우고 판을 원래대로 되돌린다
+  return { ...g, deck: g.deck.map((x) => ({ ...x, taken: false })), captured: { player: [], ai: [] }, revealed: [], revealLeft: {}, memory: [] };
+};
 
 describe('카드 구성', () => {
   it('48장, 월별 4장, 종류별 개수가 실제 화투와 같다', () => {
@@ -58,7 +62,7 @@ describe('점수 계산', () => {
 
 describe('게임 진행', () => {
   const rigged = () => {
-    const g = createGame('normal');
+    const g = cleanGame('normal');
     // 앞 4장을 1월 4장으로 고정
     const ones = HWATU_CARDS.filter((c) => c.month === 1);
     // 아이템 패는 빼서 칸 번호로 일반 카드만 고를 수 있게 한다
@@ -97,7 +101,7 @@ describe('게임 진행', () => {
     expect(aiChooseFlip(g)).toBe(1);
   });
   it('7점이 되면 고/스톱, 고 이후에는 점수가 더 올라야 한다', () => {
-    let g = createGame('normal');
+    let g = cleanGame('normal');
     g.captured.player = byName('송학광', '벚꽃광', '공산광', '오동광', '매조', '흑싸리새', '공산기러기');
     expect(scoreOf(g, 'player')).toBe(4 + 5);
     g = { ...g, phase: 'gostop' };
@@ -115,7 +119,7 @@ describe('게임 진행', () => {
     expect(stop.result.total).toBe(10); // 9점 + 1고
   });
   it('모든 카드를 가져갔는데 7점 미만이면 나가리', () => {
-    let g = createGame('normal');
+    let g = cleanGame('normal');
     g.deck = g.deck.map((s, i) => (i < 2 ? s : { ...s, taken: true }));
     // 같은 월 2장으로 맞춰놓고 마지막 짝을 맞춘 상황 재현
     g.deck[0] = { card: HWATU_CARDS[2], taken: false };
@@ -126,7 +130,7 @@ describe('게임 진행', () => {
     expect(g.result.winner).toBeNull();
   });
   it('연속으로 맞춰도 카드 4장(2번 시도)을 열면 턴이 넘어간다', () => {
-    let g = createGame('normal');
+    let g = cleanGame('normal');
     const pairs = [];
     for (let m = 1; m <= 6; m++) {
       const idx = g.deck.map((s, i) => (s.card.month === m ? i : -1)).filter((i) => i >= 0);
@@ -144,8 +148,11 @@ describe('게임 진행', () => {
   it('시작할 때 일반 카드 4장이 앞면으로 깔리고 양쪽이 한 턴씩 볼 수 있다', () => {
     for (const d of ['easy', 'normal', 'hard']) {
       let g = createGame(d);
-      expect(g.revealed).toHaveLength(START_OPEN);
+      const dealtItems = g.deck.slice(0, START_OPEN).filter((x) => x.card.kind === 'item');
+      expect(g.revealed).toHaveLength(START_OPEN - dealtItems.length);
       expect(g.revealed.every((k) => g.deck[k].card.kind !== 'item')).toBe(true);
+      expect(dealtItems.every((x) => x.taken)).toBe(true);
+      expect(g.captured.player).toHaveLength(dealtItems.length);
       const open = [...g.revealed];
       const a = g.deck.findIndex((s, k) => !open.includes(k) && s.card.kind !== 'item');
       const b = g.deck.findIndex((s, k) => !open.includes(k) && k !== a && s.card.kind !== 'item' && s.card.month !== g.deck[a].card.month);
@@ -175,7 +182,7 @@ describe('게임 진행', () => {
     expect(g.lastHidden.sort()).toEqual([firsts[0], firsts[1]].sort());
   });
   it('쉬움: 열린 카드를 다시 골라 또 틀리면 5턴이 새로 시작된다', () => {
-    let g = createGame('easy');
+    let g = cleanGame('easy');
     const f = [1, 2, 3, 4].map((m) => g.deck.findIndex((s) => s.card.month === m));
     g = resolveFlip(flipCard(flipCard(g, f[0]), f[1]));
     g = resolveFlip(flipCard(flipCard(g, f[2]), f[3]));
@@ -186,7 +193,7 @@ describe('게임 진행', () => {
     expect(g.revealLeft[f[1]]).toBe(3);
   });
   it('쉬움: 앞면 카드 2장을 골라 짝을 맞출 수 있고 유지 목록에서 빠진다', () => {
-    let g = createGame('easy');
+    let g = cleanGame('easy');
     const month = (m) => g.deck.map((s, i) => (s.card.month === m ? i : -1)).filter((i) => i >= 0);
     const [a1, a2] = month(1);
     const b1 = month(2)[0];
@@ -207,7 +214,7 @@ describe('게임 진행', () => {
     expect(g.revealed).toEqual([]);
   });
   it('AI는 기억에 없어도 앞면으로 보이는 카드의 짝을 찾는다', () => {
-    let g = createGame('easy');
+    let g = cleanGame('easy');
     const month1 = g.deck.map((s, i) => (s.card.month === 1 ? i : -1)).filter((i) => i >= 0);
     g = { ...g, turn: 'ai', flipped: [], memory: [], revealed: [month1[0], month1[1]] };
     expect(month1.slice(0, 2)).toContain(aiChooseFlip(g));
@@ -215,7 +222,7 @@ describe('게임 진행', () => {
     expect(aiChooseFlip(g)).toBe(month1[1]);
   });
   it('보통: 틀린 두 장이 방금 뒷면으로 돌아간 카드로 표시된다', () => {
-    let g = createGame('normal');
+    let g = cleanGame('normal');
     const i = g.deck.findIndex((s) => s.card.month === 1);
     const j = g.deck.findIndex((s) => s.card.month === 2);
     g = resolveFlip(flipCard(flipCard(g, i), j));
@@ -229,7 +236,7 @@ describe('게임 진행', () => {
     expect(calculateScore(cards)).toBe(2 + 5 + 3);
   });
   it('남은 카드가 4장 이하이면 고/스톱을 묻지 않고 자동 스톱한다', () => {
-    let g = createGame('normal');
+    let g = cleanGame('normal');
     // 광이 없는 월(4~6월)만 판에 남겨서, 미리 먹어 둔 광 5장(15점)과 겹치지 않게 한다
     const keep = [4, 5, 6].flatMap((m) => g.deck.map((s, i) => (s.card.month === m ? i : -1)).filter((i) => i >= 0).slice(0, 2));
     g.deck = g.deck.map((s, i) => (keep.includes(i) ? s : { ...s, taken: true }));
@@ -244,7 +251,7 @@ describe('게임 진행', () => {
     expect(g.result.how).toBe('auto');
   });
   it('남은 카드가 5장 이상이면 고/스톱을 묻는다', () => {
-    let g = createGame('normal');
+    let g = cleanGame('normal');
     const keep = [4, 5, 6, 7].flatMap((m) => g.deck.map((s, i) => (s.card.month === m ? i : -1)).filter((i) => i >= 0).slice(0, 2));
     g.deck = g.deck.map((s, i) => (keep.includes(i) ? s : { ...s, taken: true }));
     g.captured.player = fill('gwang', 5);
@@ -261,13 +268,13 @@ describe('아이템 패', () => {
   const idxOfMonth = (g, m, n = 0) => g.deck.map((s, i) => (s.card.month === m ? i : -1)).filter((i) => i >= 0)[n];
 
   it('덱은 일반 48장 + 아이템 6장이다', () => {
-    const g = createGame('normal');
+    const g = cleanGame('normal');
     expect(g.deck).toHaveLength(54);
     expect(ITEM_CARDS.map((c) => c.item).sort()).toEqual(['peek', 'reset', 'shuffle', 'ssangpi', 'ssangpi', 'tripi']);
   });
 
   it('쌍피: 먹은 패에 피 2장으로 들어가고 시도 횟수·차례는 그대로다', () => {
-    let g = createGame('normal');
+    let g = cleanGame('normal');
     const a = idxOfMonth(g, 1);
     g = flipCard(g, a); // 먼저 일반 카드 한 장 선택
     const i = idxOfItem(g, 'ssangpi');
@@ -282,13 +289,13 @@ describe('아이템 패', () => {
   });
 
   it('쓰리피는 피 3장으로 계산된다', () => {
-    let g = createGame('normal');
+    let g = cleanGame('normal');
     g = flipCard(g, idxOfItem(g, 'tripi'));
     expect(g.captured.player[0].piValue).toBe(3);
   });
 
   it('쌍피로 7점이 되어도 바로 묻지 않고, 턴이 끝날 때 고/스톱을 묻는다', () => {
-    let g = createGame('normal');
+    let g = cleanGame('normal');
     g.captured.player = fill('gwang', 5);
     g = flipCard(g, idxOfItem(g, 'ssangpi'));
     expect(g.phase).toBe('playing');
@@ -299,7 +306,7 @@ describe('아이템 패', () => {
   });
 
   it('고/스톱 점수에 닿아도 시도가 남았으면 남은 시도를 마친 뒤에 묻는다', () => {
-    let g = createGame('normal');
+    let g = cleanGame('normal');
     g.captured.player = fill('gwang', 5);
     const pair = (m) => g.deck.map((s, k) => (s.card.month === m ? k : -1)).filter((k) => k >= 0).slice(0, 2);
     g = resolveFlip(flipCard(flipCard(g, pair(6)[0]), pair(6)[1]));
@@ -309,7 +316,7 @@ describe('아이템 패', () => {
     expect(g.phase).toBe('gostop');
     expect(g.turn).toBe('player');
     // 틀려서 끝나는 경우에도 묻는다
-    let h = createGame('normal');
+    let h = cleanGame('normal');
     h.captured.player = fill('gwang', 5);
     const x = h.deck.findIndex((s) => s.card.month === 6);
     h = resolveFlip(flipCard(flipCard(h, x), h.deck.findIndex((s) => s.card.month === 6 && s !== h.deck[x])));
@@ -322,7 +329,7 @@ describe('아이템 패', () => {
   });
 
   it('섞기: 남은 카드의 위치가 바뀌고 선택·공개 카드는 따라간다', () => {
-    let g = createGame('easy');
+    let g = cleanGame('easy');
     const a = idxOfMonth(g, 1);
     const b = idxOfMonth(g, 2);
     g = { ...g, revealed: [b], revealLeft: { [b]: 3 }, memory: [a, b] };
@@ -340,7 +347,7 @@ describe('아이템 패', () => {
   });
 
   it('초기화: 열려 있던 카드를 모두 뒷면으로 돌린다 (고른 카드는 유지)', () => {
-    let g = createGame('easy');
+    let g = cleanGame('easy');
     const a = idxOfMonth(g, 1);
     const b = idxOfMonth(g, 2);
     const c = idxOfMonth(g, 3);
@@ -354,7 +361,7 @@ describe('아이템 패', () => {
   });
 
   it('엿보기(사람): 엔진 상태는 바뀌지 않고, 쓴 사람이 사람임이 기록된다', () => {
-    let g = createGame('normal');
+    let g = cleanGame('normal');
     const before = { memory: g.memory, revealed: g.revealed };
     g = flipCard(g, idxOfItem(g, 'peek'));
     expect(g.itemEvent).toMatchObject({ who: 'player', item: 'peek' });
@@ -382,7 +389,7 @@ describe('아이템 패', () => {
   });
 
   it('엿보기(AI)로 짝을 알게 된 AI는 그 짝을 고른다', () => {
-    let g = { ...createGame('normal'), turn: 'ai' };
+    let g = { ...cleanGame('normal'), turn: 'ai' };
     g = flipCard(g, idxOfItem(g, 'peek'));
     const first = aiChooseFlip(g);
     g = flipCard(g, first);
@@ -391,7 +398,7 @@ describe('아이템 패', () => {
   });
 
   it('같은 상태에서 같은 아이템을 쓰면 결과도 같다 (리듀서가 순수하다)', () => {
-    const g = createGame('normal');
+    const g = cleanGame('normal');
     const i = idxOfItem(g, 'shuffle');
     const x = flipCard(g, i);
     const y = flipCard(g, i);
@@ -399,7 +406,7 @@ describe('아이템 패', () => {
   });
 
   it('게임은 일반 카드를 모두 가져가면 끝난다 (아이템이 남아 있어도)', () => {
-    let g = createGame('normal');
+    let g = cleanGame('normal');
     const pair = [idxOfMonth(g, 1), idxOfMonth(g, 1, 1)];
     g.deck = g.deck.map((s, i) => (pair.includes(i) || s.card.kind === 'item' ? s : { ...s, taken: true }));
     g = resolveFlip(flipCard(flipCard(g, pair[0]), pair[1]));
@@ -408,7 +415,7 @@ describe('아이템 패', () => {
   });
 
   it('고: 상대 차례로 넘어가고, 열려 있던 카드의 남은 턴이 줄어든다', () => {
-    let g = createGame('easy');
+    let g = cleanGame('easy');
     g.captured.player = fill('gwang', 5);
     const m = (n) => g.deck.findIndex((s) => s.card.month === n);
     g = { ...g, phase: 'gostop', revealed: [m(6)], revealLeft: { [m(6)]: 3 }, tries: 1 };
@@ -419,7 +426,7 @@ describe('아이템 패', () => {
   });
 
   it('쌍피로 고/스톱이 되어 틀리면, 턴 끝에 고를 불러 상대 차례가 된다', () => {
-    let g = createGame('normal');
+    let g = cleanGame('normal');
     g.captured.player = fill('gwang', 5);
     g = flipCard(g, g.deck.findIndex((s) => s.card.item === 'ssangpi')); // 쌍피로 7점
     g = { ...g, tries: 1 };
@@ -433,7 +440,7 @@ describe('아이템 패', () => {
   });
 
   it('턴이 넘어갈 때마다 turnEvent가 이유와 함께 기록된다', () => {
-    let g = createGame('normal');
+    let g = cleanGame('normal');
     expect(g.turnEvent).toEqual({ n: 1, to: 'player', reason: 'start' });
     // 틀림
     const i = g.deck.findIndex((s) => s.card.month === 1);
@@ -448,7 +455,7 @@ describe('아이템 패', () => {
     g = resolveFlip(flipCard(flipCard(g, pair(5)[0]), pair(5)[1]));
     expect(g.turnEvent).toMatchObject({ to: 'ai', reason: 'tries' });
     // 고
-    let h = createGame('normal');
+    let h = cleanGame('normal');
     h.captured.player = fill('gwang', 5);
     h = declareGo({ ...h, phase: 'gostop' });
     expect(h.turnEvent).toMatchObject({ to: 'ai', reason: 'go' });
@@ -457,7 +464,7 @@ describe('아이템 패', () => {
   const pairOf = (g, m) => g.deck.map((s, k) => (!s.taken && s.card.month === m ? k : -1)).filter((k) => k >= 0).slice(0, 2);
 
   it('판쓸: 열려 있던 카드를 모두 먹으면 상대 피 한 장과 +1점', () => {
-    let g = createGame('easy');
+    let g = cleanGame('easy');
     const ms = pairOf(g, 1);
     g.revealed = [...ms];
     g.revealLeft = { [ms[0]]: 3, [ms[1]]: 3 };
@@ -467,7 +474,7 @@ describe('아이템 패', () => {
     expect(g.captured.ai).toHaveLength(3 - g.rewardEvent.stolen.length);
     expect(g.bonus.player).toBe(1);
     // 열린 카드가 남아 있으면 판쓸이 아니다
-    let h = createGame('easy');
+    let h = cleanGame('easy');
     const m2 = pairOf(h, 1);
     const other = h.deck.findIndex((s) => s.card.month === 5);
     h.revealed = [...m2, other];
@@ -487,7 +494,7 @@ describe('아이템 패', () => {
   });
 
   it('폭탄: 열린 같은 월 3장이 있을 때 맞추면 피 2장', () => {
-    let g = createGame('easy');
+    let g = cleanGame('easy');
     g.captured.ai = fill('pi', 4);
     const cards = g.deck.map((s, k) => (s.card.month === 4 ? k : -1)).filter((k) => k >= 0);
     g.revealed = cards.slice(0, 3);
