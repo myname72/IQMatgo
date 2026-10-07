@@ -89,7 +89,7 @@ function Menu({ onStart }) {
       <div className="rules">
         <h3>게임 규칙</h3>
         <p>• 화투 48장 중 같은 월 2장을 뒤집어 맞추면 가져가고 한 번 더 뒤집을 수 있습니다. 틀리거나, 한 턴에 카드 4장(2번 시도)을 모두 열면 맞췄어도 상대 차례입니다.</p>
-        <p>• 쉬움 난이도에서는 틀린 카드가 최근 6장까지 앞면으로 남아 있고, 앞면인 카드도 다시 골라 짝을 맞출 수 있습니다.</p>
+        <p>• 쉬움 난이도에서는 틀린 카드가 최근 6장까지 앞면으로 남아 있고, 앞면인 카드도 다시 골라 짝을 맞출 수 있습니다. 점선 테두리 카드는 다음에 틀리면 뒷면으로 돌아갑니다.</p>
         <p>• 광 3점(비광 포함 2점)·4광 4점·5광 15점, 고도리 5점, 홍단·청단·초단 각 3점</p>
         <p>• 열끗·띠는 5장부터 1점(이후 1장당 +1), 피는 10장부터 1점(쌍피는 2장으로 계산)</p>
         <p>• {WIN_THRESHOLD}점 이상이 되면 <b>고</b>(계속) 또는 <b>스톱</b>(종료)을 선택합니다. 고를 부른 뒤에는 점수가 더 올라야 다시 선택할 수 있습니다.</p>
@@ -145,10 +145,6 @@ function Game({ state, send }) {
 
   const playerScore = scoreOf(state, 'player');
   const aiScore = scoreOf(state, 'ai');
-  const trayIndexes = [
-    ...state.revealed,
-    ...state.flipped.filter((i) => !state.revealed.includes(i)),
-  ];
   // 다음에 틀리면 뒷면으로 돌아갈 카드 (가장 오래된 것부터)
   const limit = REVEAL_LIMIT[state.difficulty];
   const dropCount = limit ? Math.max(0, state.revealed.length + 2 - limit) : 0;
@@ -209,13 +205,16 @@ function Game({ state, send }) {
           return (
             <div className="slot" key={slot.card.id}>
               {slot.taken ? null : up ? (
-                <span
-                  className={`slot-face ${selected ? 'selected' : ''}`}
-                  style={{ transform: `translate(${dx}px, ${dy}px) rotate(${rot}deg)` }}
-                  aria-hidden="true"
+                <button
+                  type="button"
+                  className={`slot-face ${selected ? 'selected' : ''} ${dropping.has(index) ? 'dropping' : ''}`}
+                  style={{ transform: `translate(${dx}px, ${dy}px) rotate(${rot}deg) scale(1.2)` }}
+                  onClick={() => send({ type: 'FLIP', index })}
+                  disabled={!canClick || selected}
+                  title={dropping.has(index) ? '다음에 틀리면 뒷면으로 돌아갑니다' : undefined}
                 >
-                  <CardFace card={slot.card} compact />
-                </span>
+                  <CardFace card={slot.card} />
+                </button>
               ) : (
                 <button
                   type="button"
@@ -229,27 +228,6 @@ function Game({ state, send }) {
                 </button>
               )}
             </div>
-          );
-        })}
-      </div>
-
-      <div className="tray" aria-label="열려 있는 카드">
-        {trayIndexes.length === 0 && <p className="tray-empty">열려 있는 카드가 여기에 크게 보입니다</p>}
-        {trayIndexes.map((index) => {
-          const card = state.deck[index].card;
-          const selected = state.flipped.includes(index);
-          return (
-            <button
-              key={card.id}
-              type="button"
-              className={`tray-card ${selected ? 'selected' : ''} ${dropping.has(index) ? 'dropping' : ''}`}
-              onClick={() => send({ type: 'FLIP', index })}
-              disabled={!canClick || selected}
-              aria-label={`${card.month}월 ${card.name}`}
-            >
-              <CardFace card={card} />
-              {dropping.has(index) && <span className="drop-badge">곧 뒤집힘</span>}
-            </button>
           );
         })}
       </div>

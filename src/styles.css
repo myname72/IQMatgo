@@ -51,10 +51,10 @@ body {
 /* 판: 뒷면 카드만 작게, 칸마다 살짝 어긋나게 흩어 놓는다 */
 .cards-grid {
   display: grid; grid-template-columns: repeat(8, 1fr); gap: 4px;
-  width: 100%; max-width: 1100px; padding: 6px;
+  width: 100%; max-width: 1100px; padding: 12px 10px;
   background: rgba(0,0,0,0.18); border-radius: 12px;
 }
-@media (min-width: 700px) { .cards-grid { grid-template-columns: repeat(12, 1fr); gap: 8px; padding: 10px; } }
+@media (min-width: 700px) { .cards-grid { grid-template-columns: repeat(12, 1fr); gap: 8px; padding: 22px 18px; } }
 .slot { aspect-ratio: 103.2 / 168.2; position: relative; }
 .back-card {
   all: unset; position: absolute; inset: 0; border-radius: 5px; cursor: pointer;
@@ -67,35 +67,24 @@ body {
 .card-pattern { display: block; position: absolute; inset: 14%; border-radius: 3px;
   background: repeating-linear-gradient(45deg, transparent 0 5px, rgba(255,255,255,0.08) 5px 10px); }
 /* 열린 카드는 판의 제자리에도 작게 앞면으로 남는다 */
-.slot-face { position: absolute; inset: 0; border-radius: 5px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.6); outline: 2px solid rgba(255,255,255,0.45); outline-offset: -2px; }
-.slot-face.selected { outline: 3px solid #ffd700; }
+.slot-face {
+  all: unset; position: absolute; inset: 0; border-radius: 6px; overflow: hidden; cursor: pointer; z-index: 2;
+  box-shadow: 0 3px 10px rgba(0,0,0,0.65); outline: 2px solid rgba(255,255,255,0.55); outline-offset: -2px;
+  box-sizing: border-box; animation: pop 0.2s ease-out;
+}
+.slot-face:disabled { cursor: default; }
+.slot-face:focus-visible { outline: 3px solid #ffd700; }
+.slot-face.selected { outline: 3px solid #ffd700; z-index: 3; }
+/* 다음에 틀리면 뒷면으로 돌아갈 카드 */
+.slot-face.dropping { outline: 3px dashed #ffd700; outline-offset: -3px; opacity: 0.85; }
 /* 방금 뒷면으로 돌아간 카드 */
 .back-card.returned { border-color: #ffd700; animation: returned 1.2s ease-in-out infinite; }
 @keyframes returned { 0%, 100% { box-shadow: 0 0 0 0 rgba(255,215,0,0.9); } 50% { box-shadow: 0 0 0 5px rgba(255,215,0,0.15), 0 0 14px 4px rgba(255,215,0,0.7); } }
 @media (prefers-reduced-motion: reduce) { .back-card.returned { animation: none; box-shadow: 0 0 0 3px #ffd700; } }
 
-/* 열려 있는 카드: 크게 */
-.tray {
-  width: 100%; max-width: 1100px; min-height: calc(88px * 1.63 + 12px);
-  display: flex; flex-wrap: wrap; justify-content: center; align-content: flex-start; gap: 8px;
-  padding: 6px; border-radius: 12px; background: rgba(255,215,0,0.06); border: 1px dashed rgba(255,215,0,0.25);
-}
-/* 판은 트레이 위에 있으므로 트레이가 늘어나도 판의 위치는 바뀌지 않는다 */
-.tray-empty { width: 100%; align-self: center; text-align: center; font-size: 0.85rem; opacity: 0.55; }
-.tray-card {
-  all: unset; display: block; width: clamp(72px, 21vw, 88px); aspect-ratio: 103.2 / 168.2; border-radius: 8px; overflow: hidden; cursor: pointer;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.5); animation: pop 0.25s ease-out; box-sizing: border-box;
-}
-.tray-card:disabled { cursor: default; }
-.tray-card:not(:disabled):hover { transform: translateY(-4px); }
-.tray-card:focus-visible { outline: 3px solid #ffd700; }
-.tray-card { position: relative; }
-.tray-card.dropping { opacity: 0.78; }
-.drop-badge { position: absolute; left: 4px; right: 4px; bottom: 6px; padding: 2px 0; text-align: center; font: 700 0.65rem 'Noto Serif KR', serif; color: #1a1a2e; background: #ffd700; border-radius: 4px; }
-.tray-card.selected { outline: 3px solid #ffd700; outline-offset: -3px; }
-@keyframes pop { from { transform: scale(0.6); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+@keyframes pop { from { opacity: 0.4; } to { opacity: 1; } }
 .card-img { width: 100%; height: 100%; display: block; object-fit: contain; user-select: none; -webkit-user-drag: none; }
-@media (prefers-reduced-motion: reduce) { .tray-card { animation: none; } }
+@media (prefers-reduced-motion: reduce) { .slot-face { animation: none; } }
 
 @media (max-width: 480px) {
   .screen { padding: 0.5rem 0.5rem 1rem; gap: 0.4rem; }
