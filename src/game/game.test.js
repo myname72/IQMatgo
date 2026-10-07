@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { HWATU_CARDS } from './cards.js';
 import { calculateScore, scoreItems, applyGo, finalPayout } from './scoring.js';
-import { REVEAL_TURNS, MAX_TRIES, createGame, flipCard, resolveFlip, declareGo, declareStop, aiChooseFlip, scoreOf } from './engine.js';
+import { REVEAL_TURNS, AUTO_STOP_REMAINING, MAX_TRIES, createGame, flipCard, resolveFlip, declareGo, declareStop, aiChooseFlip, scoreOf } from './engine.js';
 
 const byName = (...names) => names.map((n) => HWATU_CARDS.find((c) => c.name === n));
 const fill = (kind, n) => HWATU_CARDS.filter((c) => c.kind === kind).slice(0, n);
@@ -208,5 +208,29 @@ describe('게임 진행', () => {
     expect(items.map((i) => i.label)).toEqual(['비삼광', '고도리', '홍단']);
     expect(items.reduce((a, i) => a + i.points, 0)).toBe(calculateScore(cards));
     expect(calculateScore(cards)).toBe(2 + 5 + 3);
+  });
+  it('남은 카드가 4장 이하이면 고/스톱을 묻지 않고 자동 스톱한다', () => {
+    let g = createGame('normal');
+    // 광이 없는 월(4~6월)만 판에 남겨서, 미리 먹어 둔 광 5장(15점)과 겹치지 않게 한다
+    const keep = [4, 5, 6].flatMap((m) => g.deck.map((s, i) => (s.card.month === m ? i : -1)).filter((i) => i >= 0).slice(0, 2));
+    g.deck = g.deck.map((s, i) => (keep.includes(i) ? s : { ...s, taken: true }));
+    g.captured.player = fill('gwang', 5); // 15점
+    g.captured.ai = [];
+    const [a, b] = keep.slice(0, 2); // 4월 두 장
+    g = resolveFlip(flipCard(flipCard(g, a), b));
+    expect(g.deck.filter((s) => !s.taken)).toHaveLength(AUTO_STOP_REMAINING);
+    expect(g.phase).toBe('over');
+    expect(g.result.winner).toBe('player');
+    expect(g.result.how).toBe('auto');
+  });
+  it('남은 카드가 5장 이상이면 고/스톱을 묻는다', () => {
+    let g = createGame('normal');
+    const keep = [4, 5, 6, 7].flatMap((m) => g.deck.map((s, i) => (s.card.month === m ? i : -1)).filter((i) => i >= 0).slice(0, 2));
+    g.deck = g.deck.map((s, i) => (keep.includes(i) ? s : { ...s, taken: true }));
+    g.captured.player = fill('gwang', 5);
+    const [a, b] = keep.slice(0, 2);
+    g = resolveFlip(flipCard(flipCard(g, a), b));
+    expect(g.deck.filter((s) => !s.taken)).toHaveLength(6);
+    expect(g.phase).toBe('gostop');
   });
 });

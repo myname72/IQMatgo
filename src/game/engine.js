@@ -9,6 +9,9 @@ export const REVEAL_TURNS = { easy: 5, normal: 0, hard: 0 };
 
 // 한 턴에 열 수 있는 카드는 최대 4장 (= 2장씩 2번 시도, 맞춰도 소모)
 export const MAX_FLIPS = 4;
+
+// 남은 카드가 이 장수 이하일 때 고/스톱 조건이 되면 묻지 않고 바로 스톱한다
+export const AUTO_STOP_REMAINING = 4;
 export const MAX_TRIES = MAX_FLIPS / 2;
 
 const other = (who) => (who === 'player' ? 'ai' : 'player');
@@ -145,6 +148,8 @@ export function resolveFlip(state) {
   const score = scoreOf(next, who);
   const needed = Math.max(WIN_THRESHOLD, next.lastGoScore[who] + 1);
   if (score >= needed) {
+    const remaining = next.deck.filter((d) => !d.taken).length;
+    if (remaining <= AUTO_STOP_REMAINING) return finish(next, who, 'auto');
     return { ...next, phase: 'gostop', message: `${whoLabel(who)}이(가) ${score}점! 고 또는 스톱?` };
   }
   return endTurnIfOutOfTries(next);

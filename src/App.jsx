@@ -10,6 +10,7 @@ import {
   aiDecideGoStop,
   MEMORY_LIMIT,
   MAX_FLIPS,
+  AUTO_STOP_REMAINING,
   REVEAL_TURNS,
 } from './game/engine.js';
 
@@ -50,18 +51,22 @@ function CapturedPanel({ title, cards, score, goCount }) {
   const pick = (kind) => cards.filter((c) => c.kind === kind);
   const pi = cards.filter((c) => c.kind === 'pi' || c.kind === 'ssangpi');
   const piCount = pi.reduce((sum, c) => sum + c.piValue, 0); // 쌍피는 2장
+  const items = scoreItems(cards);
+  const piItem = items.find((item) => item.key === 'pi');
   return (
     <section className="captured" aria-label={`${title}이(가) 먹은 패`}>
       <header>
         <strong>{title}</strong>
-        <span className={`pi-count ${piCount >= 10 ? 'enough' : ''}`} aria-label={`피 ${piCount}장`}>피 {piCount}</span>
+        <span className={`pi-count ${piCount >= 10 ? 'enough' : ''}`} aria-label={`피 ${piCount}장`}>
+          피 {piCount}{piItem && ` +${piItem.points}`}
+        </span>
+        <div className="captured-chips" aria-label="점수 조합">
+          {items.filter((item) => item.key !== 'pi').map((item) => (
+            <span className="chip" key={item.key}>{item.label} +{item.points}</span>
+          ))}
+        </div>
         <span className="captured-score">{score}점{goCount > 0 && ` · ${goCount}고`}</span>
       </header>
-      <div className="captured-chips" aria-label="점수 조합">
-        {scoreItems(cards).map((item) => (
-          <span className="chip" key={item.key}>{item.label} +{item.points}</span>
-        ))}
-      </div>
       <div className="captured-rows">
         <CapturedRow groups={[pick('gwang'), pick('animal'), pick('ribbon')]} className="row-upper" />
         <CapturedRow groups={[pi]} className="row-pi" />
@@ -155,7 +160,9 @@ function Game({ state, send }) {
           <p className="over-how">
             {r.how === 'stop'
               ? `${r.winner === 'player' ? '내가' : 'AI가'} 스톱을 선언했습니다`
-              : '모든 카드를 가져가서 끝났습니다'}
+              : r.how === 'auto'
+                ? `남은 카드가 ${AUTO_STOP_REMAINING}장 이하여서 ${r.winner === 'player' ? '내가' : 'AI가'} 자동으로 스톱했습니다`
+                : '모든 카드를 가져가서 끝났습니다'}
           </p>
         )}
 

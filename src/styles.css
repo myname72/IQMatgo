@@ -112,8 +112,9 @@ body {
 
 .left-badge { position: absolute; top: 2px; left: 2px; min-width: 14px; height: 14px; padding: 0 3px; border-radius: 7px; background: #ffd700; color: #1a1a2e; font: 800 0.65rem/14px 'Noto Serif KR', serif; text-align: center; box-shadow: 0 1px 3px rgba(0,0,0,0.5); }
 
-.captured-chips { display: flex; flex-wrap: wrap; gap: 4px; min-height: 22px; margin-bottom: 4px; }
-.chip { padding: 1px 8px; border-radius: 999px; font-size: 0.72rem; font-weight: 700; background: rgba(255,215,0,0.16); color: #ffe27a; border: 1px solid rgba(255,215,0,0.35); font-variant-numeric: tabular-nums; }
+.captured-chips { display: flex; flex: 1; min-width: 0; gap: 4px; overflow-x: auto; scrollbar-width: none; }
+.captured-chips::-webkit-scrollbar { display: none; }
+.chip { flex: none; white-space: nowrap; padding: 1px 8px; border-radius: 999px; font-size: 0.72rem; font-weight: 700; background: rgba(255,215,0,0.16); color: #ffe27a; border: 1px solid rgba(255,215,0,0.35); font-variant-numeric: tabular-nums; }
 
 .over-how { opacity: 0.8; font-size: 0.9rem; }
 .payout { width: 100%; max-width: 420px; background: rgba(255,255,255,0.08); border-radius: 14px; padding: 0.8rem 1.1rem; text-align: left; }
