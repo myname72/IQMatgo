@@ -60,7 +60,6 @@ body {
   width: 100%; max-width: var(--game-max); padding: 16px 8px;
   background: rgba(0,0,0,0.18); border-radius: 12px;
 }
-@media (min-width: 700px) { .cards-grid { gap: 8px; padding: 22px 18px; --reveal-scale: 1.25; } }
 .slot { aspect-ratio: 103.2 / 168.2; position: relative; }
 .back-card {
   all: unset; position: absolute; inset: 0; border-radius: 5px; cursor: pointer;
@@ -138,7 +137,6 @@ body {
 /* ---- 아이템 효과 연출 ---- */
 html, body { overflow-x: clip; }
 .cards-grid { position: relative; --pop-scale: 3; }
-@media (min-width: 700px) { .cards-grid { --pop-scale: 2.3; } }
 .item-pop { position: absolute; inset: 0; z-index: 40; pointer-events: none; }
 .item-pop-card {
   position: absolute; inset: 0; transform-origin: center;
@@ -230,8 +228,6 @@ html, body { overflow-x: clip; }
 }
 
 /* ---- 고른 카드를 크게, 분명하게 ---- */
-.cards-grid { --select-scale: 2.1; }
-@media (min-width: 700px) { .cards-grid { --select-scale: 1.6; } }
 .slot-face.selected {
   --reveal-scale: var(--select-scale);
   z-index: 30; outline: 4px solid #ffd700; outline-offset: -4px;
@@ -246,4 +242,49 @@ html, body { overflow-x: clip; }
 @media (prefers-reduced-motion: reduce) {
   .turn-banner { animation: none; transform: translate(-50%, -50%); }
   .slot-face.selected { animation: none; }
+}
+
+/* ================================================================
+   화면 크기에 맞춘 배치 (폴더블 접힘/펼침 포함)
+   - 세로로 긴 화면(접었을 때): 위에서 아래로 쌓고, 판 크기를 남는 높이에 맞춘다
+   - 가로가 더 넓은 화면(펼쳤을 때, 가로 모드, 데스크톱): 왼쪽 판, 오른쪽 먹은 패
+   화면 크기가 바뀌면(접기·펼치기·회전) CSS가 곧바로 다시 배치한다.
+   ================================================================ */
+.screen.game-screen {
+  display: grid; height: 100vh; height: 100dvh; min-height: 0; padding: 8px; gap: 8px;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: auto auto minmax(0, 1fr) auto;
+  grid-template-areas: "header" "ai" "board" "player";
+  align-items: stretch; justify-items: stretch; justify-content: stretch;
+  width: 100%; max-width: 1500px; margin: 0 auto; overflow-x: clip; overflow-y: auto;
+}
+.game-screen > .game-header { grid-area: header; max-width: none; }
+.game-screen > .captured-ai { grid-area: ai; max-width: none; }
+.game-screen > .captured-player { grid-area: player; max-width: none; }
+.game-screen > .board-wrap { grid-area: board; container-type: size; min-width: 0; min-height: 0; display: grid; place-items: center; }
+/* 세로 화면: 남는 높이만큼 먹은 패 카드를 키운다 */
+.game-screen .captured { --w: clamp(30px, min(12vw, 6dvh), 64px); --gap: 12px; }
+
+/* 판: 카드 한 장의 가로 폭(--cw)을 폭과 높이 중 더 빡빡한 쪽에 맞춘다 */
+.board-wrap > .cards-grid {
+  --pad: 10px; --cgap: 4px;
+  --cw: min(calc((100cqw - var(--pad) * 2 - var(--cgap) * 8) / 9), calc((100cqh - var(--pad) * 2 - var(--cgap) * 5) / 6 / 1.63));
+  grid-template-columns: repeat(9, var(--cw)); gap: var(--cgap);
+  width: auto; max-width: none; padding: var(--pad); justify-content: center; align-content: center;
+  --select-scale: 1.6; --reveal-scale: 1.25; --pop-scale: 2.2;
+}
+/* 카드가 작을수록 열린 카드·고른 카드·아이템 효과를 더 키운다 */
+@container (max-width: 640px), (max-height: 640px) { .cards-grid { --select-scale: 1.85; --reveal-scale: 1.4; --pop-scale: 2.7; } }
+@container (max-width: 420px), (max-height: 430px) { .cards-grid { --select-scale: 2.15; --reveal-scale: 1.55; --pop-scale: 3.2; } }
+
+@media (min-aspect-ratio: 1/1) {
+  .screen.game-screen {
+    --side-w: clamp(270px, 34vw, 440px);
+    grid-template-columns: minmax(0, 1fr) var(--side-w);
+    grid-template-rows: auto minmax(0, 1fr) minmax(0, 1fr);
+    grid-template-areas: "header header" "board ai" "board player";
+  }
+  .game-screen > .captured-ai { align-self: start; }
+  .game-screen > .captured-player { align-self: end; }
+  .game-screen .captured { --w: clamp(34px, 5.4vmin, 56px); --gap: 14px; }
 }

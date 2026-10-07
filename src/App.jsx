@@ -400,6 +400,7 @@ function Game({ state, send }) {
 
       {state.itemEvent && toastN === state.itemEvent.n && <ItemToast event={state.itemEvent} />}
 
+      <div className="board-wrap">
       <div
         className={`cards-grid ${popActive && state.itemEvent.item === 'shuffle' ? 'shuffling' : ''} ${popActive && state.itemEvent.item === 'reset' ? 'resetting' : ''}`}
         aria-label="카드 판"
@@ -440,6 +441,7 @@ function Game({ state, send }) {
             </div>
           );
         })}
+      </div>
       </div>
 
       <CapturedPanel who="player" title="플레이어" cards={state.captured.player} score={playerScore} goCount={state.goCount.player} active={state.turn === 'player'} />
