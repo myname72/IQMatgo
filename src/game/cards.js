@@ -45,7 +45,7 @@ const EN_MONTH = [
 // 카드 이미지 파일 이름 (src/assets/cards/<imageKey>.webp)
 // Wikimedia Commons "Hwatu <Month> <Hikari|Tane|Tanzaku|Kasu N>.svg" 에 대응한다.
 // 11월(오동)은 Kasu 3장 중 하나가 쌍피다.
-const NOV_SSANGPI_KASU = 3; // TODO: 이미지 확인 후 확정
+const NOV_SSANGPI_KASU = 2; // 빨간 바닥이 있는 카드 (똥쌍피)
 function imageKeyOf(month, kind, kasuNo) {
   const m = EN_MONTH[month - 1];
   if (kind === 'gwang') return `${m}_Hikari`;
