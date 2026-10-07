@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { HWATU_CARDS } from './cards.js';
 import { calculateScore, applyGo, finalPayout } from './scoring.js';
-import { createGame, flipCard, resolveFlip, declareGo, declareStop, aiChooseFlip, scoreOf } from './engine.js';
+import { MAX_TRIES, createGame, flipCard, resolveFlip, declareGo, declareStop, aiChooseFlip, scoreOf } from './engine.js';
 
 const byName = (...names) => names.map((n) => HWATU_CARDS.find((c) => c.name === n));
 const fill = (kind, n) => HWATU_CARDS.filter((c) => c.kind === kind).slice(0, n);
@@ -117,5 +117,21 @@ describe('게임 진행', () => {
     g = resolveFlip(g);
     expect(g.phase).toBe('over');
     expect(g.result.winner).toBeNull();
+  });
+  it('연속으로 맞춰도 4번 시도하면 턴이 넘어간다', () => {
+    let g = createGame('normal');
+    const pairs = [];
+    for (let m = 1; m <= 6; m++) {
+      const idx = g.deck.map((s, i) => (s.card.month === m ? i : -1)).filter((i) => i >= 0);
+      pairs.push([idx[0], idx[1]]);
+    }
+    for (let t = 0; t < MAX_TRIES; t++) {
+      expect(g.turn).toBe('player');
+      const [a, b] = pairs[t];
+      g = resolveFlip(flipCard(flipCard(g, a), b));
+      if (g.phase === 'gostop') g = declareGo(g);
+    }
+    expect(g.turn).toBe('ai');
+    expect(g.tries).toBe(0);
   });
 });

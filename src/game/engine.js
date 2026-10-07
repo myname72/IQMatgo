@@ -4,6 +4,9 @@ import { calculateScore, finalPayout, WIN_THRESHOLD } from './scoring.js';
 // AI가 기억하는 카드 수 (난이도)
 export const MEMORY_LIMIT = { easy: 4, normal: 8, hard: 14 };
 
+// 한 턴에 시도할 수 있는 최대 횟수 (2장 뒤집기 = 1회, 맞춰도 횟수는 소모)
+export const MAX_TRIES = 4;
+
 const other = (who) => (who === 'player' ? 'ai' : 'player');
 
 export function createGame(difficulty, rng = Math.random) {
@@ -13,6 +16,7 @@ export function createGame(difficulty, rng = Math.random) {
     deck: shuffle(HWATU_CARDS, rng).map((card) => ({ card, taken: false })),
     flipped: [],
     turn: 'player',
+    tries: 0, // 이번 턴에 사용한 시도 횟수
     captured: { player: [], ai: [] },
     memory: [], // 최근에 공개된 (아직 남아있는) 카드 위치
     goCount: { player: 0, ai: 0 },
@@ -94,6 +98,7 @@ export function resolveFlip(state) {
       ...state,
       flipped: [],
       turn: other(who),
+      tries: 0,
       message: who === 'player' ? '❌ 짝이 아닙니다. AI의 턴입니다.' : '당신의 턴입니다!',
     };
   }
@@ -103,6 +108,7 @@ export function resolveFlip(state) {
     ...state,
     deck,
     flipped: [],
+    tries: state.tries + 1,
     memory: state.memory.filter((k) => k !== i && k !== j),
     captured: { ...state.captured, [who]: [...state.captured[who], a, b] },
   };
@@ -115,19 +121,34 @@ export function resolveFlip(state) {
   if (score >= needed) {
     return { ...next, phase: 'gostop', message: `${whoLabel(who)}이(가) ${score}점! 고 또는 스톱?` };
   }
-  return next;
+  return endTurnIfOutOfTries(next);
+}
+
+// 맞춰서 턴이 이어지더라도 시도 횟수를 다 쓰면 상대에게 넘어간다
+function endTurnIfOutOfTries(state) {
+  if (state.tries < MAX_TRIES) return state;
+  const who = state.turn;
+  return {
+    ...state,
+    turn: other(who),
+    tries: 0,
+    message:
+      who === 'player'
+        ? `${MAX_TRIES}번의 기회를 모두 썼습니다. AI의 턴입니다.`
+        : `AI가 ${MAX_TRIES}번의 기회를 모두 썼습니다. 당신의 턴입니다!`,
+  };
 }
 
 export function declareGo(state) {
   if (state.phase !== 'gostop') return state;
   const who = state.turn;
-  return {
+  return endTurnIfOutOfTries({
     ...state,
     phase: 'playing',
     goCount: { ...state.goCount, [who]: state.goCount[who] + 1 },
     lastGoScore: { ...state.lastGoScore, [who]: scoreOf(state, who) },
     message: `${whoLabel(who)}이(가) ${state.goCount[who] + 1}고를 불렀습니다! 계속 진행합니다.`,
-  };
+  });
 }
 
 export function declareStop(state) {
