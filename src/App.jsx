@@ -78,7 +78,7 @@ function CapturedPanel({ title, cards, score, goCount }) {
 function Menu({ onStart }) {
   return (
     <div className="screen menu-screen">
-      <h1 className="title">화투 메모리 맞고</h1>
+      <h1 className="title">IQ 맞고</h1>
       <p className="subtitle">카드를 뒤집어 같은 월을 찾고, 맞고 규칙으로 점수를 겨루세요!</p>
       <div className="row">
         {DIFFICULTIES.map((d) => (
