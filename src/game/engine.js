@@ -38,6 +38,7 @@ export function createGame(difficulty, rng = Math.random) {
     memory: [], // 최근에 공개된 (아직 남아있는) 카드 위치
     goCount: { player: 0, ai: 0 },
     lastGoScore: { player: 0, ai: 0 },
+    pendingTurnEnd: null,
     message: '당신의 턴입니다. 카드 2장을 뒤집으세요!',
     result: null,
   };
@@ -130,7 +131,7 @@ function useItem(state, index) {
     case 'ssangpi':
     case 'tripi':
       next = { ...next, captured: { ...next.captured, [who]: [...next.captured[who], card] } };
-      return checkGoStop(next, who, false);
+      return next;
     case 'shuffle':
       return shuffleBoard(next, rng);
     case 'reset':
@@ -222,17 +223,7 @@ export function resolveFlip(state) {
       }
     }
     const lastHidden = [...new Set([...hidden, ...(turns ? [] : [i, j])])];
-    return {
-      ...state,
-      flipped: [],
-      revealed,
-      revealLeft,
-      lastHidden,
-      turn: other(who),
-      turnEvent: turnEventOf(state, other(who), 'miss'),
-      tries: 0,
-      message: who === 'player' ? '❌ 짝이 아닙니다. AI의 턴입니다.' : '당신의 턴입니다!',
-    };
+    return finishTurn({ ...state, flipped: [], revealed, revealLeft, lastHidden }, who, 'miss');
   }
 
   const deck = state.deck.map((s, k) => (k === i || k === j ? { ...s, taken: true } : s));
@@ -251,18 +242,25 @@ export function resolveFlip(state) {
 
   if (remainingNormal(next) === 0) return settleEnd(next);
 
-  return checkGoStop(next, who, true);
+  // 아직 시도 기회가 남아 있으면 고/스톱은 묻지 않고 턴을 마저 한다
+  if (next.tries < MAX_TRIES) return next;
+  return finishTurn(next, who, 'tries');
 }
 
-// 점수가 고/스톱 조건에 닿았는지 확인한다. 남은 카드가 적으면 묻지 않고 스톱한다.
-function checkGoStop(next, who, endTurn) {
-  const score = scoreOf(next, who);
-  const needed = Math.max(WIN_THRESHOLD, next.lastGoScore[who] + 1);
+// 턴이 끝나는 시점에 고/스톱 조건을 확인한다. 남은 카드가 적으면 묻지 않고 스톱한다.
+function finishTurn(state, who, reason) {
+  const score = scoreOf(state, who);
+  const needed = Math.max(WIN_THRESHOLD, state.lastGoScore[who] + 1);
   if (score >= needed) {
-    if (remainingNormal(next) <= AUTO_STOP_REMAINING) return finish(next, who, 'auto');
-    return { ...next, phase: 'gostop', message: `${whoLabel(who)}이(가) ${score}점! 고 또는 스톱?` };
+    if (remainingNormal(state) <= AUTO_STOP_REMAINING) return finish(state, who, 'auto');
+    return {
+      ...state,
+      phase: 'gostop',
+      pendingTurnEnd: reason,
+      message: `${whoLabel(who)}이(가) ${score}점! 고 또는 스톱?`,
+    };
   }
-  return endTurn ? endTurnIfOutOfTries(next) : next;
+  return passTurn(state, reason, reason !== 'miss');
 }
 
 // 턴이 넘어갈 때: 열려 있는 카드의 남은 턴을 하나씩 줄이고 0이 되면 뒷면으로 돌린다
@@ -283,45 +281,53 @@ function tickReveal(state, skip = []) {
   return { revealed, revealLeft, hidden };
 }
 
-// 맞춰서 턴이 이어지더라도 시도 횟수를 다 쓰면 상대에게 넘어간다
-function endTurnIfOutOfTries(state) {
-  if (state.tries < MAX_TRIES) return state;
+// 상대에게 턴을 넘긴다. 틀린 경우(miss)는 열린 카드 처리를 이미 마쳤으므로 tick=false.
+function passTurn(state, reason, tick = true) {
   const who = state.turn;
-  const { revealed, revealLeft, hidden } = tickReveal(state);
-  return {
-    ...state,
-    revealed,
-    revealLeft,
-    lastHidden: hidden,
-    turn: other(who),
-    turnEvent: turnEventOf(state, other(who), 'tries'),
-    tries: 0,
-    message:
-      who === 'player'
+  let { revealed, revealLeft, lastHidden } = state;
+  if (tick) {
+    const t = tickReveal(state);
+    revealed = t.revealed;
+    revealLeft = t.revealLeft;
+    lastHidden = t.hidden;
+  }
+  const message =
+    reason === 'miss'
+      ? who === 'player' ? '❌ 짝이 아닙니다. AI의 턴입니다.' : '당신의 턴입니다!'
+      : who === 'player'
         ? `카드 ${MAX_FLIPS}장을 모두 열었습니다. AI의 턴입니다.`
-        : `AI가 카드 ${MAX_FLIPS}장을 모두 열었습니다. 당신의 턴입니다!`,
-  };
-}
-
-// 고: 점수를 키워 두고 상대 차례로 넘어간다.
-// 짝을 맞추는 도중(첫 카드만 고른 상태)에 아이템으로 고/스톱이 된 경우, 고른 카드는 도로 덮는다.
-export function declareGo(state) {
-  if (state.phase !== 'gostop') return state;
-  const who = state.turn;
-  const { revealed, revealLeft, hidden } = tickReveal(state); // 턴이 넘어가므로 열린 카드의 남은 턴도 줄어든다
-  const goCount = state.goCount[who] + 1;
+        : `AI가 카드 ${MAX_FLIPS}장을 모두 열었습니다. 당신의 턴입니다!`;
   return {
     ...state,
     phase: 'playing',
-    goCount: { ...state.goCount, [who]: goCount },
-    lastGoScore: { ...state.lastGoScore, [who]: scoreOf(state, who) },
+    pendingTurnEnd: null,
     flipped: [],
     revealed,
     revealLeft,
-    lastHidden: [...hidden, ...state.flipped],
+    lastHidden,
     turn: other(who),
-    turnEvent: turnEventOf(state, other(who), 'go'),
+    turnEvent: turnEventOf(state, other(who), reason),
     tries: 0,
+    message,
+  };
+}
+
+// 고: 점수를 키워 두고 상대 차례로 넘어간다 (고/스톱은 턴이 끝날 때 묻는다).
+export function declareGo(state) {
+  if (state.phase !== 'gostop') return state;
+  const who = state.turn;
+  const goCount = state.goCount[who] + 1;
+  const next = passTurn(
+    {
+      ...state,
+      goCount: { ...state.goCount, [who]: goCount },
+      lastGoScore: { ...state.lastGoScore, [who]: scoreOf(state, who) },
+    },
+    'go',
+    state.pendingTurnEnd !== 'miss',
+  );
+  return {
+    ...next,
     message: `${whoLabel(who)}이(가) ${goCount}고를 불렀습니다! ${who === 'player' ? 'AI' : '당신'}의 차례입니다.`,
   };
 }

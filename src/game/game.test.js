@@ -220,6 +220,7 @@ describe('게임 진행', () => {
     g.deck = g.deck.map((s, i) => (keep.includes(i) ? s : { ...s, taken: true }));
     g.captured.player = fill('gwang', 5); // 15점
     g.captured.ai = [];
+    g.tries = 1; // 두 번째(마지막) 시도
     const [a, b] = keep.slice(0, 2); // 4월 두 장
     g = resolveFlip(flipCard(flipCard(g, a), b));
     expect(g.deck.filter((s) => !s.taken)).toHaveLength(AUTO_STOP_REMAINING);
@@ -232,6 +233,7 @@ describe('게임 진행', () => {
     const keep = [4, 5, 6, 7].flatMap((m) => g.deck.map((s, i) => (s.card.month === m ? i : -1)).filter((i) => i >= 0).slice(0, 2));
     g.deck = g.deck.map((s, i) => (keep.includes(i) ? s : { ...s, taken: true }));
     g.captured.player = fill('gwang', 5);
+    g.tries = 1;
     const [a, b] = keep.slice(0, 2);
     g = resolveFlip(flipCard(flipCard(g, a), b));
     expect(g.deck.filter((s) => !s.taken)).toHaveLength(6);
@@ -270,11 +272,38 @@ describe('아이템 패', () => {
     expect(g.captured.player[0].piValue).toBe(3);
   });
 
-  it('쌍피를 먹어 7점이 되면 고/스톱을 묻는다', () => {
+  it('쌍피로 7점이 되어도 바로 묻지 않고, 턴이 끝날 때 고/스톱을 묻는다', () => {
     let g = createGame('normal');
     g.captured.player = fill('gwang', 5);
     g = flipCard(g, idxOfItem(g, 'ssangpi'));
+    expect(g.phase).toBe('playing');
+    g = { ...g, tries: 1 };
+    const pair = g.deck.map((s, k) => (s.card.month === 6 ? k : -1)).filter((k) => k >= 0).slice(0, 2);
+    g = resolveFlip(flipCard(flipCard(g, pair[0]), pair[1]));
     expect(g.phase).toBe('gostop');
+  });
+
+  it('고/스톱 점수에 닿아도 시도가 남았으면 남은 시도를 마친 뒤에 묻는다', () => {
+    let g = createGame('normal');
+    g.captured.player = fill('gwang', 5);
+    const pair = (m) => g.deck.map((s, k) => (s.card.month === m ? k : -1)).filter((k) => k >= 0).slice(0, 2);
+    g = resolveFlip(flipCard(flipCard(g, pair(6)[0]), pair(6)[1]));
+    expect(g.phase).toBe('playing'); // 아직 한 번 더 시도 가능
+    expect(g.turn).toBe('player');
+    g = resolveFlip(flipCard(flipCard(g, pair(7)[0]), pair(7)[1]));
+    expect(g.phase).toBe('gostop');
+    expect(g.turn).toBe('player');
+    // 틀려서 끝나는 경우에도 묻는다
+    let h = createGame('normal');
+    h.captured.player = fill('gwang', 5);
+    const x = h.deck.findIndex((s) => s.card.month === 6);
+    h = resolveFlip(flipCard(flipCard(h, x), h.deck.findIndex((s) => s.card.month === 6 && s !== h.deck[x])));
+    const i = h.deck.findIndex((s) => !s.taken && s.card.month === 1);
+    const j = h.deck.findIndex((s) => !s.taken && s.card.month === 2);
+    h = resolveFlip(flipCard(flipCard(h, i), j));
+    expect(h.phase).toBe('gostop');
+    expect(h.turn).toBe('player');
+    expect(declareGo(h).turn).toBe('ai');
   });
 
   it('섞기: 남은 카드의 위치가 바뀌고 선택·공개 카드는 따라간다', () => {
@@ -374,16 +403,17 @@ describe('아이템 패', () => {
     expect(g.revealLeft[m(6)]).toBe(2);
   });
 
-  it('아이템으로 고/스톱이 되어 고를 부르면, 고른 카드는 덮이고 상대 차례가 된다', () => {
+  it('쌍피로 고/스톱이 되어 틀리면, 턴 끝에 고를 불러 상대 차례가 된다', () => {
     let g = createGame('normal');
     g.captured.player = fill('gwang', 5);
-    const a = g.deck.findIndex((s) => s.card.month === 6);
-    g = flipCard(g, a); // 짝 맞추는 도중
-    g = flipCard(g, g.deck.findIndex((s) => s.card.item === 'ssangpi')); // 쌍피 → 고/스톱
+    g = flipCard(g, g.deck.findIndex((s) => s.card.item === 'ssangpi')); // 쌍피로 7점
+    g = { ...g, tries: 1 };
+    const i = g.deck.findIndex((s) => s.card.month === 1);
+    const j = g.deck.findIndex((s) => s.card.month === 2);
+    g = resolveFlip(flipCard(flipCard(g, i), j)); // 틀려서 턴 종료 → 고/스톱
     expect(g.phase).toBe('gostop');
     g = declareGo(g);
     expect(g.flipped).toEqual([]);
-    expect(g.lastHidden).toContain(a);
     expect(g.turn).toBe('ai');
   });
 
