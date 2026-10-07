@@ -14,8 +14,8 @@ export const MAX_FLIPS = 4;
 export const AUTO_STOP_REMAINING = 4;
 export const MAX_TRIES = MAX_FLIPS / 2;
 
-// 엿보기로 공개된 카드가 유지되는 턴 수
-export const PEEK_TURNS = 5;
+// 엿보기: 쓴 사람이 모든 카드를 볼 수 있는 시간(밀리초). 화면에서 사용한다.
+export const PEEK_VIEW_MS = 3000;
 
 const other = (who) => (who === 'player' ? 'ai' : 'player');
 
@@ -73,6 +73,23 @@ function rngFor(state) {
   };
 }
 
+// AI가 엿보기로 모든 카드를 본 뒤 기억하는 카드:
+// 기억력 한도 안에서, 서로 짝이 되는 카드를 우선해서 기억한다.
+function aiPeekMemory(state, rng) {
+  const limit = MEMORY_LIMIT[state.difficulty];
+  const byMonth = {};
+  state.deck.forEach((d, i) => {
+    if (!d.taken && !isItem(d.card)) (byMonth[d.card.month] ||= []).push(i);
+  });
+  const pairs = shuffle(Object.values(byMonth).filter((a) => a.length >= 2), rng);
+  const learned = [];
+  for (const idxs of pairs) {
+    if (learned.length + 2 > limit) break;
+    learned.push(idxs[0], idxs[1]);
+  }
+  return [...new Set([...state.memory, ...learned])].slice(-limit);
+}
+
 // 남은 카드(앞면으로 열린 것 포함)의 위치를 무작위로 바꾼다
 function shuffleBoard(state, rng) {
   const positions = state.deck.map((d, i) => (d.taken ? -1 : i)).filter((i) => i >= 0);
@@ -125,16 +142,10 @@ function useItem(state, index) {
         memory: [],
       };
     case 'peek': {
-      const candidates = next.deck
-        .map((d, i) => (d.taken || isItem(d.card) || next.revealed.includes(i) || next.flipped.includes(i) ? -1 : i))
-        .filter((i) => i >= 0);
-      const picks = shuffle(candidates, rng).slice(0, 2);
-      return {
-        ...next,
-        itemEvent: { ...next.itemEvent, picks },
-        revealed: [...next.revealed, ...picks],
-        revealLeft: { ...next.revealLeft, ...Object.fromEntries(picks.map((i) => [i, PEEK_TURNS])) },
-      };
+      // 쓴 사람만 3초 동안 모든 카드를 본다. 화면 연출은 UI가 맡고, 엔진은 AI의 기억만 갱신한다.
+      // (사람이 쓰면 사람이 눈으로 기억하므로 엔진 상태는 바뀌지 않는다.)
+      if (who !== 'ai') return next;
+      return { ...next, memory: aiPeekMemory(next, rng) };
     }
     default:
       return next;

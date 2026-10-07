@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { HWATU_CARDS, ITEM_CARDS } from './cards.js';
 import { calculateScore, scoreItems, applyGo, finalPayout } from './scoring.js';
-import { PEEK_TURNS, REVEAL_TURNS, AUTO_STOP_REMAINING, MAX_TRIES, createGame, flipCard, resolveFlip, declareGo, declareStop, aiChooseFlip, scoreOf } from './engine.js';
+import { PEEK_VIEW_MS, MEMORY_LIMIT, REVEAL_TURNS, AUTO_STOP_REMAINING, MAX_TRIES, createGame, flipCard, resolveFlip, declareGo, declareStop, aiChooseFlip, scoreOf } from './engine.js';
 
 const byName = (...names) => names.map((n) => HWATU_CARDS.find((c) => c.name === n));
 const fill = (kind, n) => HWATU_CARDS.filter((c) => c.kind === kind).slice(0, n);
@@ -309,16 +309,41 @@ describe('아이템 패', () => {
     expect(g.flipped).toEqual([a]);
   });
 
-  it('엿보기: 뒷면 일반 카드 2장이 5턴 동안 공개된다', () => {
+  it('엿보기(사람): 엔진 상태는 바뀌지 않고, 쓴 사람이 사람임이 기록된다', () => {
     let g = createGame('normal');
+    const before = { memory: g.memory, revealed: g.revealed };
     g = flipCard(g, idxOfItem(g, 'peek'));
-    expect(g.revealed).toHaveLength(2);
-    for (const k of g.revealed) {
-      expect(g.deck[k].card.kind).not.toBe('item');
-      expect(g.deck[k].taken).toBe(false);
-      expect(g.revealLeft[k]).toBe(PEEK_TURNS);
+    expect(g.itemEvent).toMatchObject({ who: 'player', item: 'peek' });
+    expect(g.memory).toEqual(before.memory); // AI는 아무것도 알게 되지 않는다
+    expect(g.revealed).toEqual(before.revealed); // 상대 화면에는 아무 카드도 열리지 않는다
+    expect(PEEK_VIEW_MS).toBe(3000);
+  });
+
+  it('엿보기(AI): 기억력 한도 안에서 짝이 되는 카드를 기억한다', () => {
+    for (const diff of ['easy', 'normal', 'hard']) {
+      let g = { ...createGame(diff), turn: 'ai' };
+      g = flipCard(g, idxOfItem(g, 'peek'));
+      expect(g.itemEvent).toMatchObject({ who: 'ai', item: 'peek' });
+      expect(g.memory.length).toBeGreaterThan(0);
+      expect(g.memory.length).toBeLessThanOrEqual(MEMORY_LIMIT[diff]);
+      const months = g.memory.map((k) => g.deck[k].card.month);
+      // 짝이 되는 카드들이다 (각 월이 정확히 2장씩 들어 있다)
+      for (const m of new Set(months)) expect(months.filter((x) => x === m).length % 2).toBe(0);
+      for (const k of g.memory) {
+        expect(g.deck[k].taken).toBe(false);
+        expect(g.deck[k].card.kind).not.toBe('item');
+      }
+      expect(g.revealed).toEqual([]); // 사람에게 보이는 카드는 없다
     }
-    expect([...g.itemEvent.picks].sort()).toEqual([...g.revealed].sort());
+  });
+
+  it('엿보기(AI)로 짝을 알게 된 AI는 그 짝을 고른다', () => {
+    let g = { ...createGame('normal'), turn: 'ai' };
+    g = flipCard(g, idxOfItem(g, 'peek'));
+    const first = aiChooseFlip(g);
+    g = flipCard(g, first);
+    const second = aiChooseFlip(g);
+    expect(g.deck[second].card.month).toBe(g.deck[first].card.month);
   });
 
   it('같은 상태에서 같은 아이템을 쓰면 결과도 같다 (리듀서가 순수하다)', () => {
