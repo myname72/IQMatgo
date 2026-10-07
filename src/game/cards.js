@@ -42,9 +42,9 @@ const EN_MONTH = [
   'July', 'August', 'September', 'October', 'November', 'December',
 ];
 
-// 카드 이미지 파일 이름 (src/assets/cards/<imageKey>.webp)
-// Wikimedia Commons "Hwatu <Month> <Hikari|Tane|Tanzaku|Kasu N>.svg" 에 대응한다.
-// 11월(오동)은 Kasu 3장 중 하나가 쌍피다.
+// 카드 그림 파일 이름 (src/assets/cards/<imageKey>.svg, tools/ 의 도안 코드로 생성)
+// 이름은 광(Hikari)·열끗(Tane)·띠(Tanzaku)·피(Kasu N)를 뜻한다.
+// 11월(오동)은 피 3장 중 하나가 쌍피다. 쌍피는 아래쪽이 붉은 그림이다.
 const NOV_SSANGPI_KASU = 2; // 빨간 바닥이 있는 카드 (똥쌍피)
 function imageKeyOf(month, kind, kasuNo) {
   const m = EN_MONTH[month - 1];

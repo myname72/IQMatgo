@@ -115,10 +115,7 @@ function Menu({ onStart }) {
         <p>• 1고 +1, 2고 +2, 3고부터는 점수가 2배씩! 피박·광박이면 각각 2배</p>
         <p>• 모든 카드를 가져갔는데 {WIN_THRESHOLD}점 이상이 없으면 나가리(무승부)</p>
       </div>
-      <p className="credits">
-        카드 그림 출처:{' '}
-        <a href="https://namu.wiki/w/%ED%99%94%ED%88%AC/%ED%8C%A8" target="_blank" rel="noreferrer">나무위키 「화투/패」</a>
-      </p>
+      <p className="credits">카드 그림은 전통 화투의 소재를 바탕으로 직접 그린 것입니다.</p>
     </div>
   );
 }
