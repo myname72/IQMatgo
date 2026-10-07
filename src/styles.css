@@ -8,6 +8,7 @@ body {
   color: #fff;
 }
 
+:root { --game-max: 780px; }
 .screen { min-height: 100vh; display: flex; flex-direction: column; align-items: center; padding: 1rem; gap: 0.6rem; }
 .menu-screen { justify-content: center; text-align: center; gap: 1.2rem; }
 .over-screen { justify-content: flex-start; text-align: center; gap: 0.7rem; padding-block: 1.2rem 2rem; }
@@ -32,12 +33,12 @@ body {
 .btn-primary { background: linear-gradient(135deg, #667eea, #764ba2); color: #fff; }
 .go-button { background: linear-gradient(135deg, #f093fb, #f5576c); color: #fff; }
 
-.game-header { width: 100%; max-width: 1100px; display: flex; justify-content: space-between; align-items: center; }
+.game-header { width: 100%; max-width: var(--game-max); display: flex; justify-content: space-between; align-items: center; }
 .turn-indicator { padding: 0.5rem 1rem; border-radius: 12px; font-weight: 700; background: linear-gradient(135deg, #667eea, #764ba2); }
-.message-box { width: 100%; max-width: 1100px; text-align: center; padding: 0.5rem; border-radius: 12px; background: rgba(255,255,255,0.1); font-weight: 600; }
+.message-box { width: 100%; max-width: var(--game-max); text-align: center; padding: 0.5rem; border-radius: 12px; background: rgba(255,255,255,0.1); font-weight: 600; }
 
 /* 먹은 패: 2줄 고정(1줄 광·열끗·띠 / 2줄 피). 같은 종류끼리 가로로 살짝 겹치고 종류 사이는 벌린다 */
-.captured { --w: 36px; --gap: 12px; width: 100%; max-width: 1100px; background: rgba(255,255,255,0.07); border-radius: 12px; padding: 0.35rem 0.6rem 0.5rem; }
+.captured { --w: 36px; --gap: 12px; width: 100%; max-width: var(--game-max); background: rgba(255,255,255,0.07); border-radius: 12px; padding: 0.35rem 0.6rem 0.5rem; }
 @media (min-width: 700px) { .captured { --w: 48px; --gap: 18px; } }
 .captured header { display: flex; align-items: center; gap: 0.6rem; margin-bottom: 0.25rem; }
 .captured-score { margin-left: auto; font-weight: 900; }
@@ -55,11 +56,11 @@ body {
 
 /* 판: 뒷면 카드만 작게, 칸마다 살짝 어긋나게 흩어 놓는다 */
 .cards-grid {
-  display: grid; grid-template-columns: repeat(8, 1fr); gap: 4px;
-  width: 100%; max-width: 1100px; padding: 12px 10px;
+  display: grid; grid-template-columns: repeat(9, 1fr); gap: 4px; --reveal-scale: 1.5;
+  width: 100%; max-width: var(--game-max); padding: 16px 8px;
   background: rgba(0,0,0,0.18); border-radius: 12px;
 }
-@media (min-width: 700px) { .cards-grid { grid-template-columns: repeat(12, 1fr); gap: 8px; padding: 22px 18px; } }
+@media (min-width: 700px) { .cards-grid { gap: 8px; padding: 22px 18px; --reveal-scale: 1.25; } }
 .slot { aspect-ratio: 103.2 / 168.2; position: relative; }
 .back-card {
   all: unset; position: absolute; inset: 0; border-radius: 5px; cursor: pointer;

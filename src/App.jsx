@@ -270,7 +270,7 @@ function Game({ state, send }) {
                 <button
                   type="button"
                   className={`slot-face ${selected ? 'selected' : ''} ${dropping.has(index) ? 'dropping' : ''}`}
-                  style={{ transform: `translate(${dx}px, ${dy}px) rotate(${rot}deg) scale(1.2)` }}
+                  style={{ transform: `translate(${dx}px, ${dy}px) rotate(${rot}deg) scale(var(--reveal-scale, 1.25))` }}
                   onClick={() => send({ type: 'FLIP', index })}
                   disabled={!canClick || selected}
                   title={`앞면 유지 ${state.revealLeft[index] ?? ''}턴 남음`}
