@@ -115,7 +115,13 @@ function Menu({ onStart }) {
         <p>• 1고 +1, 2고 +2, 3고부터는 점수가 2배씩! 피박·광박이면 각각 2배</p>
         <p>• 모든 카드를 가져갔는데 {WIN_THRESHOLD}점 이상이 없으면 나가리(무승부)</p>
       </div>
-      <p className="credits">카드 그림은 전통 화투의 소재를 바탕으로 직접 그린 것입니다.</p>
+      <p className="credits">
+        카드 그림:{' '}
+        <a href="https://commons.wikimedia.org/wiki/User:Spen%C4%89jo" target="_blank" rel="noreferrer">Spenĉjo</a>,{' '}
+        <a href="https://commons.wikimedia.org/wiki/Category:SVG_Hwatu" target="_blank" rel="noreferrer">Wikimedia Commons</a>,{' '}
+        <a href="https://creativecommons.org/licenses/by-sa/4.0/deed.ko" target="_blank" rel="noreferrer">CC BY-SA 4.0</a>
+        {' '}(크기와 색을 변경함)
+      </p>
     </div>
   );
 }

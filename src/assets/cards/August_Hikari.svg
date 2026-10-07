@@ -1,6 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 103.2 168.2" width="103.2" height="168.2">
-<defs><clipPath id="c"><rect x="6" y="6" width="91.2" height="156.2" rx="5"/></clipPath></defs>
-<rect width="103.2" height="168.2" rx="9" fill="#e1131c"/>
-<rect x="5" y="5" width="93.2" height="158.2" rx="5.5" fill="#ffffff"/>
-<g clip-path="url(#c)"><circle cx="52" cy="52" r="31" fill="#e1131c" /><circle cx="52" cy="52" r="31" fill="none" stroke="#141414" stroke-width="1"/><path d="M2 168.2 L2 106 Q 13 70.82217105273158 24 79.2 Q 37 76.07298057600856 50 92 Q 63 65.88278995864093 76 69.6 Q 89 64.04794802227988 102 98 L103.2 168.2Z" fill="#141414"  /><circle cx="24" cy="148" r="8.5" fill="#e1131c" stroke="#ffffff" stroke-width="1.2"/><text x="24" y="151.23" font-size="10.63" font-weight="900" fill="#ffffff" text-anchor="middle" font-family="'Noto Serif KR','Noto Serif CJK KR','Noto Serif SC','Nanum Myeongjo',serif">光</text></g>
-</svg>
