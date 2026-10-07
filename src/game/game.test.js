@@ -148,8 +148,8 @@ describe('게임 진행', () => {
   it('시작할 때 일반 카드 4장이 앞면으로 깔리고 양쪽이 한 턴씩 볼 수 있다', () => {
     for (const d of ['easy', 'normal', 'hard']) {
       let g = createGame(d);
-      const dealtItems = g.deck.slice(0, START_OPEN).filter((x) => x.card.kind === 'item');
-      expect(g.revealed).toHaveLength(START_OPEN - dealtItems.length);
+      const dealtItems = g.deck.filter((x) => x.taken);
+      expect(g.revealed).toHaveLength(START_OPEN); // 아이템을 먹어도 일반 카드 4장은 항상 깔린다
       expect(g.revealed.every((k) => g.deck[k].card.kind !== 'item')).toBe(true);
       expect(dealtItems.every((x) => x.taken)).toBe(true);
       expect(g.captured.player).toHaveLength(dealtItems.length);

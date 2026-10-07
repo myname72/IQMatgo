@@ -24,11 +24,20 @@ export const START_OPEN = 4;
 
 export function createGame(difficulty, rng = Math.random) {
   const dealt = shuffle([...HWATU_CARDS, ...ITEM_CARDS], rng).map((card) => ({ card, taken: false }));
-  // 깔린 4장 중 아이템 카드는 효과 없이 선(사람)이 그냥 먹는다 (쌍피·쓰리피는 피로 계산)
-  const firstFour = dealt.slice(0, START_OPEN);
-  const startOpen = firstFour.map((d, i) => (isItem(d.card) ? -1 : i)).filter((i) => i >= 0);
-  const startItems = firstFour.filter((d) => isItem(d.card)).map((d) => d.card);
-  const deck = dealt.map((d, i) => (i < START_OPEN && isItem(d.card) ? { ...d, taken: true } : d));
+  // 앞에서부터 일반 카드 4장이 깔릴 때까지 넘기고, 그 사이에 나온 아이템 패는 효과 없이 선(사람)이 먹는다
+  // (쌍피·쓰리피는 피로 계산)
+  const startOpen = [];
+  const startItems = [];
+  const taken = new Set();
+  for (let i = 0; i < dealt.length && startOpen.length < START_OPEN; i++) {
+    if (isItem(dealt[i].card)) {
+      startItems.push(dealt[i].card);
+      taken.add(i);
+    } else {
+      startOpen.push(i);
+    }
+  }
+  const deck = dealt.map((d, i) => (taken.has(i) ? { ...d, taken: true } : d));
   const openTurns = Math.max(REVEAL_TURNS[difficulty] ?? 0, 2); // 최소 한 사람당 한 턴은 볼 수 있다
   return {
     phase: 'playing', // playing | gostop | over
