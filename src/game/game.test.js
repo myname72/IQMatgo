@@ -118,7 +118,7 @@ describe('게임 진행', () => {
     expect(g.phase).toBe('over');
     expect(g.result.winner).toBeNull();
   });
-  it('연속으로 맞춰도 4번 시도하면 턴이 넘어간다', () => {
+  it('연속으로 맞춰도 카드 4장(2번 시도)을 열면 턴이 넘어간다', () => {
     let g = createGame('normal');
     const pairs = [];
     for (let m = 1; m <= 6; m++) {

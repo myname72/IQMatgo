@@ -7,8 +7,9 @@ export const MEMORY_LIMIT = { easy: 4, normal: 8, hard: 14 };
 // 틀린 카드를 앞면으로 유지하는 장수 (쉬움에서만)
 export const REVEAL_LIMIT = { easy: 6, normal: 0, hard: 0 };
 
-// 한 턴에 시도할 수 있는 최대 횟수 (2장 뒤집기 = 1회, 맞춰도 횟수는 소모)
-export const MAX_TRIES = 4;
+// 한 턴에 열 수 있는 카드는 최대 4장 (= 2장씩 2번 시도, 맞춰도 소모)
+export const MAX_FLIPS = 4;
+export const MAX_TRIES = MAX_FLIPS / 2;
 
 const other = (who) => (who === 'player' ? 'ai' : 'player');
 
@@ -145,8 +146,8 @@ function endTurnIfOutOfTries(state) {
     tries: 0,
     message:
       who === 'player'
-        ? `${MAX_TRIES}번의 기회를 모두 썼습니다. AI의 턴입니다.`
-        : `AI가 ${MAX_TRIES}번의 기회를 모두 썼습니다. 당신의 턴입니다!`,
+        ? `카드 ${MAX_FLIPS}장을 모두 열었습니다. AI의 턴입니다.`
+        : `AI가 카드 ${MAX_FLIPS}장을 모두 열었습니다. 당신의 턴입니다!`,
   };
 }
 

@@ -10,7 +10,7 @@ import {
   aiChooseFlip,
   aiDecideGoStop,
   MEMORY_LIMIT,
-  MAX_TRIES,
+  MAX_FLIPS,
   REVEAL_LIMIT,
 } from './game/engine.js';
 
@@ -72,7 +72,7 @@ function Menu({ onStart }) {
       </div>
       <div className="rules">
         <h3>게임 규칙</h3>
-        <p>• 화투 48장 중 같은 월 2장을 뒤집어 맞추면 가져가고 한 번 더 뒤집을 수 있습니다. 틀리거나, 한 턴에 4번(맞춰도 횟수 소모)을 모두 쓰면 상대 차례입니다.</p>
+        <p>• 화투 48장 중 같은 월 2장을 뒤집어 맞추면 가져가고 한 번 더 뒤집을 수 있습니다. 틀리거나, 한 턴에 카드 4장(2번 시도)을 모두 열면 맞췄어도 상대 차례입니다.</p>
         <p>• 쉬움 난이도에서는 틀린 카드가 최근 6장까지 앞면으로 남아 있고, 앞면인 카드도 다시 골라 짝을 맞출 수 있습니다.</p>
         <p>• 광 3점(비광 포함 2점)·4광 4점·5광 15점, 고도리 5점, 홍단·청단·초단 각 3점</p>
         <p>• 열끗·띠는 5장부터 1점(이후 1장당 +1), 피는 10장부터 1점(쌍피는 2장으로 계산)</p>
@@ -158,7 +158,7 @@ function Game({ state, send }) {
       <div className="game-header">
         <div className="turn-indicator">
           {state.turn === 'player' ? '🎮 당신의 턴' : '🤖 AI의 턴'}
-          <span className="tries"> · 기회 {Math.min(state.tries + 1, MAX_TRIES)}/{MAX_TRIES}</span>
+          <span className="tries"> · 카드 {state.tries * 2 + state.flipped.length}/{MAX_FLIPS}장 오픈</span>
         </div>
         <button className="btn btn-primary" onClick={() => send({ type: 'MENU' })}>
           <RotateCcw size={18} /> <span>메뉴로</span>
