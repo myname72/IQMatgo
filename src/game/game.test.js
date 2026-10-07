@@ -171,4 +171,12 @@ describe('게임 진행', () => {
     g = resolveFlip(flipCard(flipCard(g, i), j));
     expect(g.revealed).toEqual([]);
   });
+  it('AI는 기억에 없어도 앞면으로 보이는 카드의 짝을 찾는다', () => {
+    let g = createGame('easy');
+    const month1 = g.deck.map((s, i) => (s.card.month === 1 ? i : -1)).filter((i) => i >= 0);
+    g = { ...g, turn: 'ai', flipped: [], memory: [], revealed: [month1[0], month1[1]] };
+    expect(month1.slice(0, 2)).toContain(aiChooseFlip(g));
+    g = { ...g, flipped: [month1[0]] };
+    expect(aiChooseFlip(g)).toBe(month1[1]);
+  });
 });

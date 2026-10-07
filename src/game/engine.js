@@ -194,7 +194,8 @@ const pick = (list, rng) => list[Math.floor(rng() * list.length)];
 export function aiChooseFlip(state, rng = Math.random) {
   const open = hidden(state).filter((i) => !state.flipped.includes(i));
   if (open.length === 0) return null;
-  const known = state.memory.filter((i) => open.includes(i));
+  // 기억 + 화면에 앞면으로 남아 있는 카드는 모두 아는 카드로 취급한다
+  const known = [...new Set([...state.memory, ...state.revealed])].filter((i) => open.includes(i));
   const monthOf = (i) => state.deck[i].card.month;
 
   if (state.flipped.length === 0) {
