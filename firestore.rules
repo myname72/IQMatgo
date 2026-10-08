@@ -6,5 +6,21 @@ service cloud.firestore {
       allow read: if request.auth != null && request.auth.uid == uid;
       allow write: if false;
     }
+
+    // 사람 대전 방: 참가자 두 명만 읽을 수 있고(방 목록 조회는 불가), 쓰기는 모두 서버만 한다.
+    match /rooms/{roomId} {
+      allow get: if request.auth != null && request.auth.uid in resource.data.seats;
+      allow list, write: if false;
+
+      // 엿보기로 본 카드: 쓴 사람만 읽는다
+      match /peek/{uid} {
+        allow get: if request.auth != null && request.auth.uid == uid;
+        allow list, write: if false;
+      }
+      // 덱 전체가 들어 있는 비공개 상태: 클라이언트는 접근 불가
+      match /private/{doc} {
+        allow read, write: if false;
+      }
+    }
   }
 }

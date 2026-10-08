@@ -5,7 +5,7 @@ import { dirname, join } from 'node:path';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 mkdirSync(join(root, 'functions/game'), { recursive: true });
-for (const f of ['engine.js', 'cards.js', 'scoring.js', 'rng.js']) {
+for (const f of ['engine.js', 'cards.js', 'scoring.js', 'rng.js', 'pvp.js']) {
   cpSync(join(root, 'src/game', f), join(root, 'functions/game', f));
 }
 console.log('functions/game 갱신 완료');

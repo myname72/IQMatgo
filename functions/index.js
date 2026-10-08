@@ -72,3 +72,5 @@ export const settleAiGame = onCall(opts, async (req) => {
     return { earned, winner: result.winner, score: result.total ?? 0, earnedToday: earnedToday + earned, dailyCap: DAILY_AI_CAP, perScore: POINTS_PER_SCORE, rate: AI_REWARD_RATE };
   });
 });
+
+export { createRoom, joinRoom, quickMatch, leaveRoom, playAction, claimTimeout, rematch } from './pvpApi.js';

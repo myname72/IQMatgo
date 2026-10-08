@@ -392,6 +392,19 @@ export function declareGo(state) {
   };
 }
 
+// 시간 초과: 고르던 카드를 덮고 상대에게 턴을 넘긴다 (사람 대전용)
+export function skipTurn(state) {
+  if (state.phase !== 'playing') return state;
+  return passTurn({ ...state, flipped: [], lastHidden: [...state.flipped] }, 'timeout');
+}
+
+// 기권/이탈: loser 가 졌다. 이긴 쪽 점수는 최소 WIN_THRESHOLD점으로 쳐서, 지는 판을 끊고 나가는 게 이득이 되지 않게 한다.
+export function forfeitGame(state, loser) {
+  const winner = other(loser);
+  const s = finish(state, winner, 'forfeit');
+  return { ...s, result: { ...s.result, total: Math.max(WIN_THRESHOLD, s.result.total) } };
+}
+
 export function declareStop(state) {
   if (state.phase !== 'gostop') return state;
   return finish(state, state.turn, 'stop');
