@@ -99,7 +99,7 @@ export const ITEM_INFO = {
   tripi: { title: '쓰리피', desc: '피 3장으로 계산되는 피를 얻습니다' },
   shuffle: { title: '섞기', desc: '남은 카드의 위치가 모두 바뀝니다' },
   reset: { title: '초기화', desc: '열려 있던 카드가 모두 뒷면으로 돌아갑니다' },
-  peek: { title: '엿보기', desc: '쓴 사람만 3초 동안 모든 카드를 봅니다' },
+  peek: { title: '엿보기', desc: '쓴 사람만 3초 동안 닫힌 카드의 절반(아이템 패 제외)을 봅니다' },
 };
 
 export const KIND_LABEL = {

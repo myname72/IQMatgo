@@ -100,11 +100,22 @@ function rngFor(state) {
 
 // AI가 엿보기로 모든 카드를 본 뒤 기억하는 카드:
 // 기억력 한도 안에서, 서로 짝이 되는 카드를 우선해서 기억한다.
+// 엿보기로 볼 수 있는 카드: 지금 닫혀 있는 일반 카드(아이템 패 제외) 중 무작위 절반
+export function peekSubset(state, rng) {
+  const closed = [];
+  state.deck.forEach((d, i) => {
+    if (!d.taken && !isItem(d.card) && !state.flipped.includes(i) && !state.revealed.includes(i)) closed.push(i);
+  });
+  if (closed.length === 0) return [];
+  return shuffle(closed, rng).slice(0, Math.max(1, Math.floor(closed.length / 2)));
+}
+
 function aiPeekMemory(state, rng) {
   const limit = MEMORY_LIMIT[state.difficulty];
   const byMonth = {};
+  const seen = new Set(peekSubset(state, rng)); // AI도 사람과 같이 절반만 본다
   state.deck.forEach((d, i) => {
-    if (!d.taken && !isItem(d.card)) (byMonth[d.card.month] ||= []).push(i);
+    if (seen.has(i)) (byMonth[d.card.month] ||= []).push(i);
   });
   const pairs = shuffle(Object.values(byMonth).filter((a) => a.length >= 2), rng);
   const learned = [];

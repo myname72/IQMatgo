@@ -1,6 +1,8 @@
 // 사람 대전용 상태 변환. 서버(Cloud Functions)와 클라이언트가 함께 쓴다.
 // 서버는 전체 상태(덱 포함)를 비공개로 들고 있고, 클라이언트에는 "보이는 것만" 담긴 공개 상태를 내려 준다.
 
+import { peekSubset } from './engine.js';
+
 const HIDDEN = (index) => ({ id: `hidden-${index}`, month: 0, kind: 'hidden', name: '' });
 
 // 공개 상태: 먹은 카드·뒤집어 둔 카드·앞면으로 남은 카드의 정체만 남기고 나머지는 가린다.
@@ -33,11 +35,9 @@ export function swapSides(view) {
   return v;
 }
 
-// 엿보기: 쓴 사람에게만 보내는 "아직 남은 모든 카드" 정보
-export function peekCardsOf(state) {
+// 엿보기: 쓴 사람에게만 보내는 정보. 닫혀 있는 일반 카드의 무작위 절반만 보내고, 아이템 패는 보내지 않는다.
+export function peekCardsOf(state, rng = Math.random) {
   const out = {};
-  state.deck.forEach((slot, i) => {
-    if (!slot.taken) out[i] = slot.card;
-  });
+  for (const i of peekSubset(state, rng)) out[i] = state.deck[i].card;
   return out;
 }

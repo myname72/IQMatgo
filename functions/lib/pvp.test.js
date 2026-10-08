@@ -44,10 +44,12 @@ describe('사람 대전: 서버 규칙', () => {
     expect(v.turnEvent.to).toBe('player');
   });
 
-  it('엿보기 정보에는 남은 모든 카드가 들어 있다', () => {
+  it('엿보기 정보에는 닫힌 일반 카드의 절반만 들어 있고 아이템 패는 없다', () => {
     const g = fresh('A');
     const cards = peekCardsOf(g.state);
-    expect(Object.keys(cards).length).toBe(g.state.deck.filter((s) => !s.taken).length);
+    const closed = g.state.deck.filter((s, i) => !s.taken && s.card.kind !== 'item' && !g.state.revealed.includes(i)).length;
+    expect(Object.keys(cards).length).toBe(Math.floor(closed / 2));
+    expect(Object.values(cards).every((c) => c.kind !== 'item')).toBe(true);
   });
 
   it('시간 초과: 턴이 넘어가고, 연속 3번이면 기권패', () => {

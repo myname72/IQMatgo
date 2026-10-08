@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { HWATU_CARDS, ITEM_CARDS } from './cards.js';
 import { calculateScore, scoreItems, applyGo, finalPayout } from './scoring.js';
-import { PEEK_VIEW_MS, START_OPEN, MEMORY_LIMIT, REVEAL_TURNS, AUTO_STOP_REMAINING, MAX_TRIES, createGame, flipCard, resolveFlip, declareGo, declareStop, aiChooseFlip, scoreOf } from './engine.js';
+import { peekSubset, PEEK_VIEW_MS, START_OPEN, MEMORY_LIMIT, REVEAL_TURNS, AUTO_STOP_REMAINING, MAX_TRIES, createGame, flipCard, resolveFlip, declareGo, declareStop, aiChooseFlip, scoreOf } from './engine.js';
 
 const byName = (...names) => names.map((n) => HWATU_CARDS.find((c) => c.name === n));
 const fill = (kind, n) => HWATU_CARDS.filter((c) => c.kind === kind).slice(0, n);
@@ -520,5 +520,19 @@ describe('아이템 패', () => {
     expect(g.turnEvent).toMatchObject({ to: 'ai', reason: 'start' });
     expect(g.captured.player).toHaveLength(0);
     expect(g.revealed).toHaveLength(START_OPEN);
+  });
+
+  it('엿보기로 보이는 카드: 닫힌 일반 카드의 절반이고, 아이템·열린·먹은 카드는 빠진다', () => {
+    let g = cleanGame('easy');
+    const open = g.deck.findIndex((s) => s.card.kind !== 'item');
+    g.revealed = [open];
+    g.revealLeft = { [open]: 3 };
+    const taken = g.deck.findIndex((s, i) => i !== open && s.card.kind !== 'item');
+    g.deck = g.deck.map((s, i) => (i === taken ? { ...s, taken: true } : s));
+    const closed = g.deck.filter((s, i) => !s.taken && s.card.kind !== 'item' && i !== open).length;
+    const sub = peekSubset(g, Math.random);
+    expect(sub).toHaveLength(Math.floor(closed / 2));
+    expect(sub.every((i) => g.deck[i].card.kind !== 'item' && !g.deck[i].taken && i !== open)).toBe(true);
+    expect(new Set(sub).size).toBe(sub.length);
   });
 });

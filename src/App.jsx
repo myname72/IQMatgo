@@ -24,6 +24,7 @@ import {
   AUTO_STOP_REMAINING,
   PEEK_VIEW_MS,
   REVEAL_TURNS,
+  peekSubset,
 } from './game/engine.js';
 
 // AI 대전과 사람 대전은 같은 규칙(틀린 카드 5턴 유지)을 쓴다
@@ -369,7 +370,7 @@ function Menu({ onStart, onPvp }) {
         <p>• 화투 48장 중 같은 월 2장을 뒤집어 맞추면 가져가고 한 번 더 뒤집을 수 있습니다. 틀리거나, 한 턴에 카드 4장(2번 시도)을 모두 열면 맞췄어도 상대 차례입니다.</p>
         <p>• 시작할 때 <b>카드 4장이 앞면으로 깔려</b> 있어, 먼저 하는 쪽이 불리하지 않도록 두 사람이 한 턴씩 보고 시작합니다. 이긴 편이 다음 판의 선이 됩니다. 깔다가 아이템 패가 나오면 효과 없이 선(먼저 하는 사람)이 그냥 먹고, 일반 카드 4장은 항상 깔립니다.</p>
         <p>• 틀린 카드는 5턴(사람과 AI의 턴을 모두 셉니다) 동안 앞면으로 남아 있고, 앞면인 카드도 다시 골라 짝을 맞출 수 있습니다. 카드 모서리의 숫자는 남은 턴이고, 점선 테두리 카드는 이번 턴이 끝나면 뒷면으로 돌아갑니다.</p>
-        <p>• 판에는 <b>아이템 패 6장</b>(쌍피 2, 쓰리피, 섞기, 초기화, 엿보기)이 섞여 있습니다. 뒤집으면 그 자리에서 효과가 발동하고 시도 횟수는 쓰지 않습니다. 쌍피·쓰리피는 피 2장·3장으로 계산되어 먹은 패에 들어가고, 섞기는 남은 카드의 위치를 모두 바꾸며, 초기화는 열려 있던 카드를 모두 뒷면으로 돌리고, 엿보기는 쓴 사람만 3초 동안 판의 모든 카드를 볼 수 있게 합니다(상대에게는 보이지 않고, 그동안 카드를 누를 수 없습니다).</p>
+        <p>• 판에는 <b>아이템 패 6장</b>(쌍피 2, 쓰리피, 섞기, 초기화, 엿보기)이 섞여 있습니다. 뒤집으면 그 자리에서 효과가 발동하고 시도 횟수는 쓰지 않습니다. 쌍피·쓰리피는 피 2장·3장으로 계산되어 먹은 패에 들어가고, 섞기는 남은 카드의 위치를 모두 바꾸며, 초기화는 열려 있던 카드를 모두 뒷면으로 돌리고, 엿보기는 쓴 사람만 3초 동안 닫혀 있는 카드의 절반(무작위, 아이템 패는 제외)을 볼 수 있게 합니다(상대에게는 보이지 않고, 그동안 카드를 누를 수 없습니다).</p>
         <p>• 광 3점(비광 포함 2점)·4광 4점·5광 15점, 고도리 5점, 홍단·청단·초단 각 3점</p>
         <p>• 열끗·띠는 5장부터 1점(이후 1장당 +1), 피는 10장부터 1점(쌍피는 2장으로 계산)</p>
         <p>• <b>보너스</b>(상대 피를 가져옴): <b>판쓸</b> 열려 있던 카드를 모두 먹음(+1점도) · <b>쪽</b> 앞면으로 열려 있지 않던 두 장을 뒤집어 바로 짝(첫 번째·두 번째 시도 모두) · <b>폭탄</b> 앞면으로 열린 같은 월 3장이 있을 때 맞춤(피 2장)</p>
@@ -598,14 +599,17 @@ function Game({ state, send, onStart, settle, remote, remoteEnter }) {
     return () => clearInterval(t);
   }, [remote?.deadline]);
   const secondsLeft = remote?.deadline ? Math.max(0, Math.ceil((remote.deadline - Date.now()) / 1000)) : null;
-  // 엿보기(사람이 쓴 경우): 연출이 보인 뒤 3초 동안 모든 카드를 앞면으로 보여 준다. AI가 쓰면 사람 화면은 그대로다.
+  // 엿보기(사람이 쓴 경우): 연출이 보인 뒤 3초 동안 닫힌 카드의 절반(아이템 패 제외)을 앞면으로 보여 준다. AI가 쓰면 사람 화면은 그대로다.
   const peekN = state?.itemEvent?.item === 'peek' && state.itemEvent.who === 'player' ? state.itemEvent.n : 0;
-  const [peekPhase, setPeekPhase] = useState(null); // null | 'wait'(연출 중) | 'show'(모든 카드 공개)
+  const [peekPhase, setPeekPhase] = useState(null); // null | 'wait'(연출 중) | 'show'(카드 공개)
+  const [peekSet, setPeekSet] = useState(null); // 혼자 하는 판에서 엿보기로 보이는 카드 위치
   useEffect(() => {
     if (!peekN) {
       setPeekPhase(null);
+      setPeekSet(null);
       return undefined;
     }
+    if (!remote) setPeekSet(new Set(peekSubset(state, seededRng(((state.seed ^ Math.imul(peekN, 2654435761)) >>> 0) || 1))));
     setPeekPhase('wait');
     const t1 = setTimeout(() => setPeekPhase('show'), 700);
     const t2 = setTimeout(() => {
@@ -689,6 +693,8 @@ function Game({ state, send, onStart, settle, remote, remoteEnter }) {
   // 이번 턴이 끝나면 뒷면으로 돌아갈 카드 (남은 턴이 1)
   const dropping = new Set(state.revealed.filter((i) => state.revealLeft[i] === 1));
   const popActive = Boolean(state.itemEvent && toastN === state.itemEvent.n);
+  // 엿보기로 보이는 카드 (사람 대전은 서버가 보내 준 것만, 혼자 하는 판은 고른 절반만)
+  const peekCardAt = (slot, index) => (remote ? remote.peekDeck?.[index] ?? null : peekSet?.has(index) ? slot.card : null);
   const canClick = state.phase === 'playing' && state.turn === 'player' && state.flipped.length < 2 && !peekPhase;
 
   if (state.phase === 'over') {
@@ -786,7 +792,7 @@ function Game({ state, send, onStart, settle, remote, remoteEnter }) {
       <div className={`board-wrap ${peekPhase === 'show' ? 'peeking' : ''}`}>
         {peekPhase === 'show' && (
           <div className="peek-timer" role="status">
-            <span>엿보기 · 모든 카드가 보입니다</span>
+            <span>엿보기 · 닫힌 카드의 절반이 보입니다</span>
             <i style={{ animationDuration: `${PEEK_VIEW_MS}ms` }} />
           </div>
         )}
@@ -814,13 +820,13 @@ function Game({ state, send, onStart, settle, remote, remoteEnter }) {
                   <CardFace card={slot.card} />
                   {state.revealLeft[index] > 0 && <span className="left-badge">{state.revealLeft[index]}</span>}
                 </button>
-              ) : peekPhase === 'show' && (slot.card.kind !== 'hidden' || remote?.peekDeck?.[index]) ? (
+              ) : peekPhase === 'show' && peekCardAt(slot, index) ? (
                 <span
                   className="peek-face"
                   style={{ transform: `translate(${dx}px, ${dy}px) rotate(${rot}deg) scale(1.08)` }}
                   aria-label="엿보기로 본 카드"
                 >
-                  <CardFace card={slot.card.kind === 'hidden' ? remote.peekDeck[index] : slot.card} />
+                  <CardFace card={peekCardAt(slot, index)} />
                 </span>
               ) : (
                 <button

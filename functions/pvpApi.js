@@ -290,7 +290,7 @@ export const playAction = onCall(opts, async (req) => {
     const ev = next.state.itemEvent;
     if (ev && ev.n !== ctx.game.state.itemEvent?.n && ev.item === 'peek') {
       const who = seatOf(ev.who);
-      tx.set(peekRef(roomId, ctx.seatUid[who]), { n: ev.n, cardsJson: JSON.stringify(peekCardsOf(next.state)), at: now });
+      tx.set(peekRef(roomId, ctx.seatUid[who]), { n: ev.n, cardsJson: JSON.stringify(peekCardsOf(next.state, secureRng)), at: now });
     }
     commit(tx, ctx, next, now);
     return { ok: true };
