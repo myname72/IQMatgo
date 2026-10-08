@@ -36,10 +36,9 @@ jobs:
           projectId: ${{ vars.FIREBASE_PROJECT_ID }}
           channelId: ${{ github.event_name == 'push' && 'live' || '' }}
       # 서버 함수(포인트 정산)와 보안 규칙 배포: main 에 합쳐질 때만.
-      # 서비스 계정에 권한이 부족해도 호스팅 배포는 이미 끝났으므로 실패해도 전체를 막지 않는다.
+      # 호스팅 배포는 이미 끝난 뒤라, 함수 배포가 실패해도 사이트는 그대로다. 대신 실패는 빨간색으로 보이게 둔다.
       - name: Deploy Cloud Functions
         if: github.event_name == 'push'
-        continue-on-error: true
         env:
           SA_JSON: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
         run: |
@@ -47,6 +46,7 @@ jobs:
           export GOOGLE_APPLICATION_CREDENTIALS="$RUNNER_TEMP/sa.json"
           (cd functions && npm ci)
           npx --yes firebase-tools@latest deploy --only functions --project "${{ vars.FIREBASE_PROJECT_ID }}" --non-interactive
+      # 규칙은 콘솔에서 직접 올려도 되므로, 권한(Firebase 규칙 관리자)이 없어 실패해도 전체를 막지 않는다.
       - name: Deploy Firestore rules
         if: github.event_name == 'push'
         continue-on-error: true
