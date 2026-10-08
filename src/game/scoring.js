@@ -44,14 +44,15 @@ export function scoreItems(cards) {
   const s = summarize(cards);
   const items = [];
   const g = gwangScore(s.gwang);
-  if (g > 0) items.push({ key: 'gwang', label: gwangLabel(s.gwang), points: g });
-  if (s.godori) items.push({ key: 'godori', label: '고도리', points: 5 });
-  if (s.hongdan) items.push({ key: 'hongdan', label: '홍단', points: 3 });
-  if (s.cheongdan) items.push({ key: 'cheongdan', label: '청단', points: 3 });
-  if (s.chodan) items.push({ key: 'chodan', label: '초단', points: 3 });
-  if (s.animals.length >= 5) items.push({ key: 'animal', label: `열끗 ${s.animals.length}장`, points: s.animals.length - 4 });
-  if (s.ribbons.length >= 5) items.push({ key: 'ribbon', label: `띠 ${s.ribbons.length}장`, points: s.ribbons.length - 4 });
-  if (s.piCount >= 10) items.push({ key: 'pi', label: `피 ${s.piCount}장`, points: s.piCount - 9 });
+  // note: 결과 화면에서 "왜 이 점수인지" 설명하는 문구
+  if (g > 0) items.push({ key: 'gwang', label: gwangLabel(s.gwang), points: g, note: `광 ${s.gwang.length}장 (비광이 끼면 삼광은 2점)` });
+  if (s.godori) items.push({ key: 'godori', label: '고도리', points: 5, note: '매조·흑싸리새·공산기러기 3장 (새 3장)' });
+  if (s.hongdan) items.push({ key: 'hongdan', label: '홍단', points: 3, note: '홍단 띠 3장 (송학·매조·벚꽃)' });
+  if (s.cheongdan) items.push({ key: 'cheongdan', label: '청단', points: 3, note: '청단 띠 3장 (모란·국화·단풍)' });
+  if (s.chodan) items.push({ key: 'chodan', label: '초단', points: 3, note: '초단 띠 3장 (흑싸리·난초·홍싸리 띠)' });
+  if (s.animals.length >= 5) items.push({ key: 'animal', label: `열끗 ${s.animals.length}장`, points: s.animals.length - 4, note: '열끗 5장부터 1점, 이후 1장마다 +1점' });
+  if (s.ribbons.length >= 5) items.push({ key: 'ribbon', label: `띠 ${s.ribbons.length}장`, points: s.ribbons.length - 4, note: '띠 5장부터 1점, 이후 1장마다 +1점' });
+  if (s.piCount >= 10) items.push({ key: 'pi', label: `피 ${s.piCount}장`, points: s.piCount - 9, note: '피 10장부터 1점, 이후 1장마다 +1점 (쌍피 2장·쓰리피 3장으로 셈)' });
   return items;
 }
 
@@ -81,6 +82,8 @@ export function finalPayout(winnerCards, loserCards, goCount, bonus = 0) {
   if (bonus) items.push({ key: 'bonus', label: '판쓸 보너스', points: bonus });
   const base = calculateScore(winnerCards) + bonus;
   const withGo = applyGo(base, goCount);
+  const goBonus = goCount > 0 ? Math.min(goCount, 2) : 0; // 1고 +1, 2고 이상 +2
+  const goMultiplier = goCount >= 3 ? 2 ** (goCount - 2) : 1; // 3고 ×2, 4고 ×4, 5고 ×8 …
   const { pibak, gwangbak } = detectBak(winnerCards, loserCards);
   const multiplier = (pibak ? 2 : 1) * (gwangbak ? 2 : 1);
   const l = summarize(loserCards);
@@ -89,6 +92,8 @@ export function finalPayout(winnerCards, loserCards, goCount, bonus = 0) {
     base,
     goCount,
     withGo,
+    goBonus,
+    goMultiplier,
     pibak,
     gwangbak,
     loserPi: l.piCount,

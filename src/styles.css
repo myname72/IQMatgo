@@ -459,3 +459,8 @@ body:has(.lobby) { background: radial-gradient(130% 70% at 50% 0%, #11505a 0%, #
 .start-toast { position: fixed; top: calc(env(safe-area-inset-top, 0px) + 60px); left: 50%; transform: translateX(-50%); z-index: 22; max-width: min(92vw, 420px); padding: 8px 14px; border-radius: 12px; background: rgba(14,20,40,0.95); border: 1px solid #ffd84d; font-size: 0.88rem; text-align: center; pointer-events: none; animation: toast-in 0.25s ease-out; }
 .start-toast b { color: #ffe27a; }
 .start-toast.below-item { top: calc(env(safe-area-inset-top, 0px) + 190px); }
+
+.payout-item { align-items: flex-start; }
+.payout-item small, .payout-step small { display: block; font-size: 0.72rem; opacity: 0.65; font-weight: 400; line-height: 1.3; }
+.payout-step span { max-width: 75%; }
+.payout-formula { margin-top: 6px; font-size: 0.82rem; opacity: 0.8; text-align: right; font-variant-numeric: tabular-nums; }

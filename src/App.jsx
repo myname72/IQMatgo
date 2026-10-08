@@ -809,12 +809,24 @@ function Game({ state, send, onStart, settle, remote, remoteEnter }) {
             <h3>{winnerName} 득점 내역</h3>
             <ul>
               {r.items.map((item) => (
-                <li key={item.key}><span>{item.label}</span><b>+{item.points}</b></li>
+                <li key={item.key} className="payout-item">
+                  <div><span>{item.label}</span>{item.note && <small>{item.note}</small>}</div>
+                  <b>+{item.points}</b>
+                </li>
               ))}
             </ul>
-            <div className="payout-line"><span>소계</span><b>{r.base}점</b></div>
-            {r.goCount > 0 && (
-              <div className="payout-line"><span>{r.goCount}고</span><b>{r.withGo}점</b></div>
+            <div className="payout-line"><span>소계 (위 점수의 합)</span><b>{r.base}점</b></div>
+            {r.goBonus > 0 && (
+              <div className="payout-line payout-step">
+                <span>고 보너스 <small>{r.goCount}고 → +{r.goBonus}점 (1고 +1, 2고 이상 +2)</small></span>
+                <b>{r.base + r.goBonus}점</b>
+              </div>
+            )}
+            {r.goMultiplier > 1 && (
+              <div className="payout-line payout-step">
+                <span>고 배수 <small>3고부터 2배씩 → {r.goCount}고 ×{r.goMultiplier}</small></span>
+                <b>{r.withGo}점</b>
+              </div>
             )}
             {r.pibak && (
               <div className="payout-line"><span>피박 (상대 피 {r.loserPi}장)</span><b>×2</b></div>
@@ -823,6 +835,12 @@ function Game({ state, send, onStart, settle, remote, remoteEnter }) {
               <div className="payout-line"><span>광박 (상대 광 {r.loserGwang}장)</span><b>×2</b></div>
             )}
             <div className="payout-total"><span>합계</span><b>{r.total}점</b></div>
+            <p className="payout-formula">
+              계산: {r.goBonus > 0 ? `(${r.base} + ${r.goBonus})` : r.base}
+              {r.goMultiplier > 1 ? ` × ${r.goMultiplier}(${r.goCount}고)` : ''}
+              {r.pibak ? ' × 2(피박)' : ''}
+              {r.gwangbak ? ' × 2(광박)' : ''} = {r.total}점
+            </p>
           </section>
         )}
 
