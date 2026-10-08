@@ -270,7 +270,7 @@ export function resolveFlip(state) {
   // 보너스: 판쓸·쪽·폭탄은 상대의 피를 가져온다 (판쓸은 +1점도 더한다)
   const rewards = [];
   if (state.revealed.length > 0 && next.revealed.length === 0) rewards.push({ kind: 'sweep', label: '판쓸', pi: 1, bonus: 1 });
-  if (state.tries === 0 && !state.revealed.includes(i) && !state.revealed.includes(j)) rewards.push({ kind: 'jjok', label: '쪽', pi: 1 });
+  if (!state.revealed.includes(i) && !state.revealed.includes(j)) rewards.push({ kind: 'jjok', label: '쪽', pi: 1 });
   if (state.revealed.filter((k) => state.deck[k].card.month === a.month).length >= 3) rewards.push({ kind: 'bomb', label: '폭탄', pi: 2 });
   if (rewards.length) {
     const r = applyRewards(next, who, rewards);

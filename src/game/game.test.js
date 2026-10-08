@@ -493,6 +493,16 @@ describe('아이템 패', () => {
     expect(g.captured.ai).toHaveLength(2);
   });
 
+  it('쪽: 두 번째 시도(3·4번째 카드)에서도 처음 보는 두 장이 짝이면 상대 피 한 장', () => {
+    let g = cleanGame('normal');
+    g.captured.ai = fill('pi', 3);
+    g.tries = 1;
+    const [x, y] = pairOf(g, 4);
+    g = resolveFlip(flipCard(flipCard(g, x), y));
+    expect(g.rewardEvent.rewards.map((r) => r.kind)).toEqual(['jjok']);
+    expect(g.captured.ai).toHaveLength(2);
+  });
+
   it('폭탄: 열린 같은 월 3장이 있을 때 맞추면 피 2장', () => {
     let g = cleanGame('easy');
     g.captured.ai = fill('pi', 4);
