@@ -198,11 +198,24 @@ function useItem(state, index) {
   }
 }
 
-export function flipCard(state, index) {
+// 지금 이 카드를 고를 수 있는지.
+// 앞면으로 보이는(revealed) 카드도 고를 수 있지만, 앞면 카드 두 장은 짝이 맞을 때만 고를 수 있다.
+// 못 맞출 것 같을 때 이미 아는 카드 두 장을 골라 상대에게 새 카드를 안 보여 주는 꼼수를 막는다.
+export function canFlip(state, index) {
   const slot = state.deck[index];
-  if (state.phase !== 'playing' || !slot || slot.taken) return state;
-  // 앞면으로 남아 있는(revealed) 카드도 다시 선택할 수 있다
-  if (state.flipped.length >= 2 || state.flipped.includes(index)) return state;
+  if (state.phase !== 'playing' || !slot || slot.taken) return false;
+  if (state.flipped.length >= 2 || state.flipped.includes(index)) return false;
+  if (state.flipped.length === 1) {
+    const first = state.flipped[0];
+    if (state.revealed.includes(first) && state.revealed.includes(index)
+      && state.deck[first].card.month !== slot.card.month) return false;
+  }
+  return true;
+}
+
+export function flipCard(state, index) {
+  if (!canFlip(state, index)) return state;
+  const slot = state.deck[index];
   if (isItem(slot.card)) return useItem(state, index);
   return {
     ...state,
@@ -460,7 +473,7 @@ const hidden = (state) =>
 const pick = (list, rng) => list[Math.floor(rng() * list.length)];
 
 export function aiChooseFlip(state, rng = Math.random) {
-  const open = hidden(state).filter((i) => !state.flipped.includes(i));
+  const open = hidden(state).filter((i) => canFlip(state, i)); // 규칙상 고를 수 있는 칸만
   if (open.length === 0) return null;
   // 기억 + 화면에 앞면으로 남아 있는 카드는 모두 아는 카드로 취급한다
   const known = [...new Set([...state.memory, ...state.revealed])].filter((i) => open.includes(i));

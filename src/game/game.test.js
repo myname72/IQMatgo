@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { seededRng } from './rng.js';
 import { HWATU_CARDS, ITEM_CARDS } from './cards.js';
 import { calculateScore, scoreItems, applyGo, finalPayout } from './scoring.js';
-import { peekSubset, PEEK_VIEW_MS, START_OPEN, MEMORY_LIMIT, REVEAL_TURNS, AUTO_STOP_REMAINING, MAX_TRIES, createGame, flipCard, resolveFlip, declareGo, declareStop, aiChooseFlip, scoreOf } from './engine.js';
+import { canFlip, peekSubset, PEEK_VIEW_MS, START_OPEN, MEMORY_LIMIT, REVEAL_TURNS, AUTO_STOP_REMAINING, MAX_TRIES, createGame, flipCard, resolveFlip, declareGo, declareStop, aiChooseFlip, scoreOf } from './engine.js';
 
 const byName = (...names) => names.map((n) => HWATU_CARDS.find((c) => c.name === n));
 const fill = (kind, n) => HWATU_CARDS.filter((c) => c.kind === kind).slice(0, n);
@@ -232,10 +232,51 @@ describe('게임 진행', () => {
     g = resolveFlip(flipCard(flipCard(g, f[0]), f[1]));
     g = resolveFlip(flipCard(flipCard(g, f[2]), f[3]));
     expect(g.revealLeft[f[0]]).toBe(4);
-    g = resolveFlip(flipCard(flipCard(g, f[0]), f[2])); // f[0]를 다시 골라 틀림
+    const fresh = g.deck.findIndex((x, i) => !x.taken && !g.revealed.includes(i) && x.card.kind !== 'item' && x.card.month !== 1);
+    g = resolveFlip(flipCard(flipCard(g, f[0]), fresh)); // 앞면 f[0] + 아직 안 본 카드로 틀림
     expect(g.revealLeft[f[0]]).toBe(5);
-    expect(g.revealLeft[f[2]]).toBe(5);
+    expect(g.revealLeft[fresh]).toBe(5);
     expect(g.revealLeft[f[1]]).toBe(3);
+  });
+
+  it('앞면으로 보이는 카드 두 장은 짝이 맞을 때만 고를 수 있다 (꼼수 방지)', () => {
+    let g = cleanGame('easy');
+    const at = (m, n = 0) => g.deck.map((s, k) => (s.card.month === m ? k : -1)).filter((k) => k >= 0)[n];
+    // 1월 한 장과 2월 한 장을 앞면으로 만들어 둔다
+    const a = at(1);
+    const b = at(2);
+    g = { ...g, revealed: [a, b], revealLeft: { [a]: 3, [b]: 3 } };
+
+    // 앞면 a 를 고른 뒤 짝이 아닌 앞면 b 는 고를 수 없다
+    const one = flipCard(g, a);
+    expect(one.flipped).toEqual([a]);
+    expect(canFlip(one, b)).toBe(false);
+    expect(flipCard(one, b)).toBe(one); // 상태가 그대로 = 선택되지 않음
+
+    // 아직 안 본 카드는 짝이 아니어도 고를 수 있다
+    const fresh = g.deck.findIndex((x, i) => !x.taken && i !== a && i !== b && x.card.kind !== 'item' && x.card.month !== 1);
+    expect(canFlip(one, fresh)).toBe(true);
+    expect(flipCard(one, fresh).flipped).toEqual([a, fresh]);
+
+    // 앞면 카드끼리라도 짝이 맞으면 고를 수 있다
+    const a2 = at(1, 1);
+    let h = { ...g, revealed: [a, a2], revealLeft: { [a]: 3, [a2]: 3 } };
+    h = flipCard(h, a);
+    expect(canFlip(h, a2)).toBe(true);
+    expect(flipCard(h, a2).flipped).toEqual([a, a2]);
+  });
+
+  it('AI도 짝이 아닌 앞면 카드 두 장을 고르지 않는다', () => {
+    let g = cleanGame('easy');
+    const at = (m) => g.deck.map((s, k) => (s.card.month === m ? k : -1)).filter((k) => k >= 0)[0];
+    const a = at(1);
+    const b = at(2);
+    g = { ...g, turn: 'ai', revealed: [a, b], revealLeft: { [a]: 3, [b]: 3 }, flipped: [a] };
+    for (let n = 0; n < 60; n++) {
+      const pickIdx = aiChooseFlip(g, Math.random);
+      expect(pickIdx).not.toBe(b);
+      expect(canFlip(g, pickIdx)).toBe(true);
+    }
   });
   it('쉬움: 앞면 카드 2장을 골라 짝을 맞출 수 있고 유지 목록에서 빠진다', () => {
     let g = cleanGame('easy');
