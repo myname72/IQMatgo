@@ -34,6 +34,7 @@ export function useAccount() {
     status,
     user,
     points: wallet?.points ?? null,
+    activeRoom: wallet?.activeRoom ?? null,
     error,
     setError,
     signIn: () => signIn().catch((e) => setError(explain(e))),

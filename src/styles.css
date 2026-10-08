@@ -369,3 +369,13 @@ body:has(.burst-bomb) #root { animation: bomb-shake 0.6s ease-out; }
 .settle-line { text-align: center; font-size: 0.95rem; opacity: 0.85; }
 .settle-line.earned { color: #ffe27a; font-weight: 900; opacity: 1; font-size: 1.1rem; }
 .net-toast { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); z-index: 40; padding: 10px 16px; border-radius: 12px; background: rgba(14,20,40,0.96); border: 1px solid #ffd84d; font-size: 0.9rem; max-width: 90vw; text-align: center; }
+
+/* 사람 대전 */
+.pvp-lobby { display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 10px 12px; border-radius: 14px; background: rgba(255,200,80,0.08); border: 1px solid rgba(255,216,77,0.35); max-width: 100%; }
+.pvp-lobby h3 { font-size: 1.05rem; }
+.code-input { width: 9.5rem; padding: 0.55rem 0.8rem; border-radius: 10px; border: 1px solid rgba(255,255,255,0.25); background: rgba(0,0,0,0.3); color: #fff; font: inherit; font-size: 1rem; text-align: center; letter-spacing: 0.15em; }
+.room-code { font-size: clamp(3rem, 18vw, 5rem); font-weight: 900; letter-spacing: 0.2em; color: #ffe27a; text-shadow: 0 0 18px rgba(255,200,60,0.5); padding-left: 0.2em; }
+.time-left { font-variant-numeric: tabular-nums; }
+.time-left.urgent { color: #fff3a0; animation: pulse-urgent 0.8s ease-in-out infinite; }
+@keyframes pulse-urgent { 50% { opacity: 0.45; } }
+.time-left { white-space: nowrap; }

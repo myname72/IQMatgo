@@ -2,7 +2,7 @@ import { firebaseConfig, firebaseEnabled } from './config.js';
 
 let cached = null;
 // firebase 코드는 필요할 때만 불러온다 (게스트는 내려받지 않는다)
-async function load() {
+export async function load() {
   if (!firebaseEnabled) return null;
   if (!cached) {
     cached = (async () => {
@@ -97,7 +97,7 @@ export function watchWallet(user, cb, onError = () => {}) {
     // 지갑이 없으면 서버가 시작 포인트로 만든다. 서버 호출이 실패해도 이미 있는 지갑은 그대로 읽는다.
     await call('ensureWallet', {}).catch(() => {});
     if (dead) return;
-    off = fb.F.onSnapshot(ref, (s) => s.exists() && cb({ points: s.data().points }), onError);
+    off = fb.F.onSnapshot(ref, (s) => s.exists() && cb({ points: s.data().points, activeRoom: s.data().activeRoom ?? null }), onError);
   });
   return () => {
     dead = true;
@@ -106,7 +106,7 @@ export function watchWallet(user, cb, onError = () => {}) {
 }
 
 // 서버 함수 호출 (로그인 필요). 판 시작 시 서버가 시드를 정해 주고, 끝나면 조작 기록으로 정산한다.
-async function call(name, data) {
+export async function call(name, data) {
   const fb = await load();
   const res = await fb.N.httpsCallable(fb.fns, name)(data);
   return res.data;

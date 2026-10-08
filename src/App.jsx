@@ -6,8 +6,11 @@ import { createContext, useContext } from 'react';
 import { useAccount } from './firebase/useAccount.js';
 import { settleAiGameOnServer, startAiGameOnServer } from './firebase/wallet.js';
 import { seededRng } from './game/rng.js';
+import PvpRoom from './pvp/PvpRoom.jsx';
+import { createRoom, joinRoom, messageOf, quickMatch } from './firebase/pvp.js';
 
 const AccountContext = createContext(null);
+const OpponentContext = createContext('AI'); // 상대 이름 (사람 대전이면 닉네임)
 import { ITEM_CARDS, ITEM_INFO } from './game/cards.js';
 import { WIN_THRESHOLD, scoreItems } from './game/scoring.js';
 import {
@@ -113,26 +116,29 @@ const TURN_REASON = {
   miss: { player: 'AI가 짝을 맞추지 못했습니다', ai: '짝이 맞지 않았습니다' },
   tries: { player: `AI가 카드 ${MAX_FLIPS}장을 모두 열었습니다`, ai: `카드 ${MAX_FLIPS}장을 모두 열었습니다` },
   go: { player: 'AI가 고를 불렀습니다', ai: '고를 불렀습니다' },
+  timeout: { player: '상대가 시간을 넘겼습니다', ai: '시간이 초과되었습니다' },
 };
 function TurnBanner({ event }) {
+  const opp = useContext(OpponentContext);
   const mine = event.to === 'player';
-  const sub = TURN_REASON[event.reason]?.[event.to];
+  const sub = TURN_REASON[event.reason]?.[event.to]?.replace('AI', opp);
   return (
     <div className={`turn-banner ${mine ? 'mine' : 'theirs'}`} role="status" aria-live="polite">
-      <strong>{mine ? '당신의 턴' : 'AI의 턴'}</strong>
+      <strong>{mine ? '당신의 턴' : `${opp}의 턴`}</strong>
       {sub && <span>{sub}</span>}
     </div>
   );
 }
 
 function ItemToast({ event }) {
+  const opp = useContext(OpponentContext);
   const card = ITEM_CARDS.find((c) => c.item === event.item);
   const info = ITEM_INFO[event.item];
   return (
     <div className="item-toast" role="status" aria-live="polite">
       <div className="item-toast-card"><CardFace card={card} /></div>
       <div>
-        <strong>{event.who === 'player' ? '내가' : 'AI가'} {info.title}!</strong>
+        <strong>{event.who === 'player' ? '내가' : `${opp}이(가)`} {info.title}!</strong>
         <p>{info.desc}</p>
         <p className="item-toast-note">시도 횟수는 쓰지 않습니다</p>
       </div>
@@ -160,12 +166,13 @@ function RewardBurst({ event }) {
 }
 
 function SweepToast({ event }) {
+  const opp = useContext(OpponentContext);
   const names = event.stolen.map((c) => c.name ?? '피').join(', ');
   return (
     <div className="item-toast sweep-toast" role="status" aria-live="polite">
       <div className="sweep-emoji" aria-hidden="true">✨</div>
       <div>
-        <strong>{event.who === 'player' ? '내가' : 'AI가'} {event.rewards.map((r) => r.label).join(' · ')}!</strong>
+        <strong>{event.who === 'player' ? '내가' : `${opp}이(가)`} {event.rewards.map((r) => r.label).join(' · ')}!</strong>
         <p>
           {event.stolen.length ? `상대의 피 ${event.stolen.length}장(${names})을 가져옵니다` : '상대에게 가져올 피가 없습니다'}
           {event.bonus ? ` · +${event.bonus}점` : ''}
@@ -261,6 +268,12 @@ function AccountBar() {
 
 function SettleLine({ settle, winner }) {
   let text;
+  if (settle.status === 'pvp') {
+    if (settle.drawn) text = '비겼습니다. 포인트 이동은 없습니다.';
+    else if (settle.delta === 0) text = '상대 포인트가 없어 이동한 포인트가 없습니다.';
+    else text = `🪙 ${settle.delta > 0 ? '+' : '−'}${Math.abs(settle.delta).toLocaleString()} 포인트 (상대와 정산)`;
+    return <p className={`settle-line ${settle.delta > 0 ? 'earned' : ''}`}>{text}</p>;
+  }
   if (settle.status === 'pending') text = '포인트 정산 중…';
   else if (settle.status === 'error') text = '포인트 정산에 실패했습니다. (이 판은 반영되지 않습니다)';
   else if (settle.earned > 0) text = `🪙 +${settle.earned.toLocaleString()} 포인트 (오늘 AI 대전 ${settle.earnedToday.toLocaleString()} / ${settle.dailyCap.toLocaleString()})`;
@@ -269,10 +282,49 @@ function SettleLine({ settle, winner }) {
   return <p className={`settle-line ${settle.earned > 0 ? 'earned' : ''}`}>{text}</p>;
 }
 
-function Menu({ onStart }) {
+function PvpLobby({ onEnter, resumeRoom }) {
+  const acc = useContext(AccountContext);
+  const [code, setCode] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState('');
+  const run = async (fn) => {
+    setBusy(true);
+    setErr('');
+    try {
+      const res = await fn();
+      onEnter(res.roomId);
+    } catch (e) {
+      setErr(messageOf(e));
+    }
+    setBusy(false);
+  };
+  if (acc.status !== 'in') return null;
+  return (
+    <section className="pvp-lobby" aria-label="사람 대전">
+      <h3>⚔️ 사람 대전</h3>
+      <p className="account-note">점당 100포인트를 걸고 겨룹니다 · 10,000 포인트 이상 필요 · 한 수에 30초</p>
+      {resumeRoom && (
+        <button className="btn btn-hard" onClick={() => onEnter(resumeRoom)} disabled={busy}>진행 중인 대전으로 돌아가기</button>
+      )}
+      <div className="account-actions">
+        <button className="btn btn-normal account-btn" onClick={() => run(quickMatch)} disabled={busy}>빠른 대전</button>
+        <button className="btn btn-easy account-btn" onClick={() => run(() => createRoom('normal'))} disabled={busy}>방 만들기</button>
+      </div>
+      <form className="account-actions" onSubmit={(e) => { e.preventDefault(); run(() => joinRoom(code.trim())); }}>
+        <input className="code-input" inputMode="numeric" pattern="[0-9]*" maxLength={4} placeholder="방 코드 4자리" value={code} onChange={(e) => setCode(e.target.value.replace(/\D/g, ''))} />
+        <button className="btn btn-primary account-btn" disabled={busy || code.length !== 4}>코드로 입장</button>
+      </form>
+      {err && <span className="account-error">{err}</span>}
+    </section>
+  );
+}
+
+function Menu({ onStart, onPvp }) {
+  const acc = useContext(AccountContext);
   return (
     <div className="screen menu-screen">
       <AccountBar />
+      <PvpLobby onEnter={onPvp} resumeRoom={acc.activeRoom} />
       <h1 className="title">IQ 맞고</h1>
       <p className="subtitle">카드를 뒤집어 같은 월을 찾고, 맞고 규칙으로 점수를 겨루세요!</p>
       <div className="row">
@@ -399,10 +451,20 @@ const LOGGED = new Set(['FLIP', 'RESOLVE', 'GO', 'STOP']);
 // 이긴 편이 다음 판의 선이 된다 (비기면 이전 선 유지)
 const nextFirst = (state) => (state?.phase === 'over' ? (state.result?.winner ?? state.first ?? 'player') : 'player');
 
+// 상대 이름을 알려 주는 래퍼 (사람 대전이면 닉네임, 아니면 AI)
+function GameView(props) {
+  return (
+    <OpponentContext.Provider value={props.remote?.names.other || 'AI'}>
+      <Game {...props} />
+    </OpponentContext.Provider>
+  );
+}
+
 // state === null 이면 메뉴 화면
 export default function App() {
   const [state, send] = useReducer(appReducer, null);
   const account = useAccount();
+  const [pvpRoom, setPvpRoom] = useState(null); // 사람 대전 중인 방 id
   const [notice, setNotice] = useState('');
   const [settle, setSettle] = useState(null); // 정산 결과: {status:'pending'|'done'|'error', ...}
 
@@ -457,14 +519,39 @@ export default function App() {
   useGameSounds(state);
   return (
     <AccountContext.Provider value={account}>
-      <Game state={state} send={send} onStart={startGame} settle={settle} />
+      {pvpRoom ? (
+        <PvpRoom
+          roomId={pvpRoom}
+          uid={account.user?.uid}
+          Game={GameView}
+          useGameSounds={useGameSounds}
+          onExit={() => setPvpRoom(null)}
+          onFallbackToAi={() => {
+            setPvpRoom(null);
+            setNotice('상대가 없어 AI와 연습 판으로 시작합니다.');
+            setTimeout(() => setNotice(''), 3000);
+            startGame('normal');
+          }}
+        />
+      ) : (
+        <GameView state={state} send={send} onStart={startGame} settle={settle} remoteEnter={setPvpRoom} />
+      )}
       {notice && <div className="net-toast" role="status">{notice}</div>}
-      {(!state || state.phase === 'over') && <SoundControls />}
+      {!pvpRoom && (!state || state.phase === 'over') && <SoundControls />}
     </AccountContext.Provider>
   );
 }
 
-function Game({ state, send, onStart, settle }) {
+function Game({ state, send, onStart, settle, remote, remoteEnter }) {
+  const opp = remote?.names.other || 'AI';
+  const myName = remote?.names.me || '플레이어';
+  const [, forceTick] = useState(0); // 사람 대전: 남은 시간 표시를 1초마다 갱신
+  useEffect(() => {
+    if (!remote?.deadline) return undefined;
+    const t = setInterval(() => forceTick((n) => n + 1), 1000);
+    return () => clearInterval(t);
+  }, [remote?.deadline]);
+  const secondsLeft = remote?.deadline ? Math.max(0, Math.ceil((remote.deadline - Date.now()) / 1000)) : null;
   // 엿보기(사람이 쓴 경우): 연출이 보인 뒤 3초 동안 모든 카드를 앞면으로 보여 준다. AI가 쓰면 사람 화면은 그대로다.
   const peekN = state?.itemEvent?.item === 'peek' && state.itemEvent.who === 'player' ? state.itemEvent.n : 0;
   const [peekPhase, setPeekPhase] = useState(null); // null | 'wait'(연출 중) | 'show'(모든 카드 공개)
@@ -528,7 +615,7 @@ function Game({ state, send, onStart, settle }) {
     let id;
     if (state.phase === 'playing' && state.flipped.length === 2) {
       id = setTimeout(() => send({ type: 'RESOLVE' }), 1100); // 뒤집은 두 장을 볼 시간
-    } else if (state.phase === 'playing' && state.turn === 'ai') {
+    } else if (!remote && state.phase === 'playing' && state.turn === 'ai') {
       // 아이템 연출이 보이는 동안에는 기다렸다가, 끝나면(toastN 변경) 이어서 진행한다
       if (state.itemEvent && toastN === state.itemEvent.n) return undefined;
       // 턴 배너가 보이는 동안에도 기다린다 (누구 차례인지 눈으로 확인할 시간)
@@ -537,17 +624,17 @@ function Game({ state, send, onStart, settle }) {
         const index = aiChooseFlip(state);
         if (index !== null) send({ type: 'FLIP', index });
       }, 700);
-    } else if (state.phase === 'gostop' && state.turn === 'ai') {
+    } else if (!remote && state.phase === 'gostop' && state.turn === 'ai') {
       id = setTimeout(
         () => send({ type: aiDecideGoStop(state) === 'go' ? 'GO' : 'STOP' }),
         1400,
       );
     }
     return () => clearTimeout(id);
-  }, [state, send, toastN, turnToastN]);
+  }, [state, send, toastN, turnToastN, remote]);
 
   if (!state) {
-    return <Menu onStart={onStart} />;
+    return <Menu onStart={onStart} onPvp={remoteEnter} />;
   }
 
   const playerScore = scoreOf(state, 'player');
@@ -560,22 +647,24 @@ function Game({ state, send, onStart, settle }) {
 
   if (state.phase === 'over') {
     const r = state.result;
-    const winnerName = r.winner === 'player' ? '내' : 'AI의';
+    const winnerName = r.winner === 'player' ? '내' : `${opp}의`;
     return (
       <div className="screen over-screen">
         <h2 className="over-title">{state.message}</h2>
         {r.winner && (
           <p className="over-how">
             {r.how === 'stop'
-              ? `${r.winner === 'player' ? '내가' : 'AI가'} 스톱을 선언했습니다`
+              ? `${r.winner === 'player' ? '내가' : `${opp}이(가)`} 스톱을 선언했습니다`
               : r.how === 'auto'
-                ? `남은 카드가 ${AUTO_STOP_REMAINING}장 이하여서 ${r.winner === 'player' ? '내가' : 'AI가'} 자동으로 스톱했습니다`
-                : '모든 카드를 가져가서 끝났습니다'}
+                ? `남은 카드가 ${AUTO_STOP_REMAINING}장 이하여서 ${r.winner === 'player' ? '내가' : `${opp}이(가)`} 자동으로 스톱했습니다`
+                : r.how === 'forfeit'
+                  ? (r.winner === 'player' ? '상대가 기권해서 이겼습니다' : '기권(또는 시간 초과 반복)으로 졌습니다')
+                  : '모든 카드를 가져가서 끝났습니다'}
           </p>
         )}
 
-        <CapturedPanel who="ai" title="AI" cards={state.captured.ai} score={aiScore} goCount={state.goCount.ai} />
-        <CapturedPanel who="player" title="플레이어" cards={state.captured.player} score={playerScore} goCount={state.goCount.player} />
+        <CapturedPanel who="ai" title={opp} cards={state.captured.ai} score={aiScore} goCount={state.goCount.ai} />
+        <CapturedPanel who="player" title={myName} cards={state.captured.player} score={playerScore} goCount={state.goCount.player} />
 
         {r.winner && (
           <section className="payout" aria-label="득점 내역">
@@ -599,16 +688,27 @@ function Game({ state, send, onStart, settle }) {
           </section>
         )}
 
-        {state.gameId && settle && <SettleLine settle={settle} winner={r.winner} />}
+        {(state.gameId || remote) && settle && <SettleLine settle={settle} winner={r.winner} />}
 
-        <div className="row">
-          <button className="btn btn-primary" onClick={() => onStart(state.difficulty)}>
-            <RotateCcw size={18} /> <span>다시 하기</span>
-          </button>
-          <button className="btn btn-normal" onClick={() => send({ type: 'MENU' })}>
-            <span>메뉴로</span>
-          </button>
-        </div>
+        {remote ? (
+          <div className="row">
+            <button className="btn btn-primary" onClick={remote.onRematch} disabled={remote.rematchSent}>
+              <RotateCcw size={18} /> <span>{remote.rematchSent ? '상대를 기다리는 중…' : remote.opponentWantsRematch ? '한 판 더 (상대가 원해요)' : '한 판 더'}</span>
+            </button>
+            <button className="btn btn-normal" onClick={remote.onExit}>
+              <span>나가기</span>
+            </button>
+          </div>
+        ) : (
+          <div className="row">
+            <button className="btn btn-primary" onClick={() => onStart(state.difficulty)}>
+              <RotateCcw size={18} /> <span>다시 하기</span>
+            </button>
+            <button className="btn btn-normal" onClick={() => send({ type: 'MENU' })}>
+              <span>메뉴로</span>
+            </button>
+          </div>
+        )}
       </div>
     );
   }
@@ -617,8 +717,9 @@ function Game({ state, send, onStart, settle }) {
     <div className="screen game-screen">
       <div className="game-header">
         <div className={`turn-indicator ${state.turn === 'player' ? 'mine' : 'theirs'}`}>
-          {state.turn === 'player' ? '🎮 당신의 턴' : '🤖 AI의 턴'}
+          {state.turn === 'player' ? '🎮 당신의 턴' : `${remote ? '👤' : '🤖'} ${opp}의 턴`}
           <span className="tries"> · 카드 {state.tries * 2 + state.flipped.length}/{MAX_FLIPS}장 오픈</span>
+          {secondsLeft !== null && state.phase !== 'over' && <span className={`time-left ${secondsLeft <= 10 ? 'urgent' : ''}`}> · ⏱ {secondsLeft}초</span>}
         </div>
         <div className="header-actions">
           <SoundControls inline />
@@ -630,7 +731,7 @@ function Game({ state, send, onStart, settle }) {
 
       {state.turnEvent && turnToastN === state.turnEvent.n && <TurnBanner event={state.turnEvent} />}
 
-      <CapturedPanel who="ai" title="AI" cards={state.captured.ai} score={aiScore} goCount={state.goCount.ai} active={state.turn === 'ai'} />
+      <CapturedPanel who="ai" title={opp} cards={state.captured.ai} score={aiScore} goCount={state.goCount.ai} active={state.turn === 'ai'} />
 
       {state.itemEvent && toastN === state.itemEvent.n && <ItemToast event={state.itemEvent} />}
       {state.rewardEvent && rewardToastN === state.rewardEvent.n && <RewardBurst event={state.rewardEvent} />}
@@ -667,13 +768,13 @@ function Game({ state, send, onStart, settle }) {
                   <CardFace card={slot.card} />
                   {state.revealLeft[index] > 0 && <span className="left-badge">{state.revealLeft[index]}</span>}
                 </button>
-              ) : peekPhase === 'show' ? (
+              ) : peekPhase === 'show' && (slot.card.kind !== 'hidden' || remote?.peekDeck?.[index]) ? (
                 <span
                   className="peek-face"
                   style={{ transform: `translate(${dx}px, ${dy}px) rotate(${rot}deg) scale(1.08)` }}
-                  aria-label={`${slot.card.month}월 ${slot.card.name}`}
+                  aria-label="엿보기로 본 카드"
                 >
-                  <CardFace card={slot.card} />
+                  <CardFace card={slot.card.kind === 'hidden' ? remote.peekDeck[index] : slot.card} />
                 </span>
               ) : (
                 <button
@@ -694,7 +795,7 @@ function Game({ state, send, onStart, settle }) {
       </div>
       </div>
 
-      <CapturedPanel who="player" title="플레이어" cards={state.captured.player} score={playerScore} goCount={state.goCount.player} active={state.turn === 'player'} />
+      <CapturedPanel who="player" title={myName} cards={state.captured.player} score={playerScore} goCount={state.goCount.player} active={state.turn === 'player'} />
 
       {state.phase === 'gostop' && state.turn === 'player' && (
         <div className="gostop-overlay" role="dialog" aria-label="고 또는 스톱">
