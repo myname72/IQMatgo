@@ -49,7 +49,7 @@ describe('사람 대전 API (인메모리 Firestore)', () => {
   });
 
   it('방 코드로 입장한다 / 내 방·잘못된 코드는 거부', async () => {
-    const { roomId, code } = await api.createRoom(req('alice'));
+    const { roomId, code } = await api.createRoom(req('alice', { private: true }));
     expect(await api.joinRoom(req('alice', { code }))).toMatchObject({ roomId, resumed: true }); // 내 방은 새로 입장하지 않고 이어서 들어간다
     await expect(api.joinRoom(req('bob', { code: '0000' }))).rejects.toMatchObject({ code: 'not-found' });
     const j = await api.joinRoom(req('bob', { code }));
@@ -177,5 +177,25 @@ describe('사람 대전 API (인메모리 Firestore)', () => {
     const a = await api.createRoom(req('alice'));
     const b = await api.quickMatch(req('bob'));
     expect(b).toMatchObject({ roomId: a.roomId, matched: true });
+  });
+
+  it('비밀방: 목록·빠른 대전에 나오지 않고, 방 id 로는 못 들어가며, 코드로만 입장한다', async () => {
+    const a = await api.createRoom(req('alice', { private: true }));
+    expect(a.code).toMatch(/^\d{4}$/);
+    expect(room(a.roomId).private).toBe(true);
+    expect((await api.listRooms(req('bob'))).rooms).toEqual([]);
+    await expect(api.joinRoom(req('bob', { roomId: a.roomId }))).rejects.toMatchObject({ code: 'permission-denied' });
+    const q = await api.quickMatch(req('bob')); // 비밀방에 끼어들지 않고 자기 방을 만든다
+    expect(q.roomId).not.toBe(a.roomId);
+    expect(q.waiting).toBe(true);
+    await api.leaveRoom(req('bob', { roomId: q.roomId }));
+    const j = await api.joinRoom(req('bob', { code: a.code }));
+    expect(j.roomId).toBe(a.roomId);
+    expect(room(a.roomId).status).toBe('playing');
+  });
+
+  it('공개방은 코드를 돌려주지 않는다', async () => {
+    const a = await api.createRoom(req('alice', { private: false }));
+    expect(a.code).toBeUndefined();
   });
 });

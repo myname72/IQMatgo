@@ -3,7 +3,7 @@ import { swapSides } from '../game/pvp.js';
 
 // ---- 서버 함수 (사람 대전) ----
 export const quickMatch = () => call('quickMatch', {});
-export const createRoom = (difficulty) => call('createRoom', { difficulty });
+export const createRoom = (secret = false) => call('createRoom', { private: secret });
 export const joinByCode = (code) => call('joinRoom', { code });
 export const joinById = (roomId) => call('joinRoom', { roomId });
 export const listRooms = () => call('listRooms', {});

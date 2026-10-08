@@ -321,14 +321,14 @@ function PvpLobby({ onEnter, resumeRoom }) {
   return (
     <section className="pvp-lobby" aria-label="사람 대전">
       <h3>⚔️ 사람 대전</h3>
-      <p className="account-note">AI 대전과 같은 규칙 · 점당 100포인트 · 3,000 포인트 이상 필요 · 한 수에 30초</p>
-      <p className="account-note">방을 만들면 AI와 연습하며 기다리다가, 누군가 들어오면 바로 대전이 시작됩니다.</p>
+      <p className="account-note">점당 100포인트 · 3,000 포인트 이상 · 한 수 30초 · 방을 만들면 AI와 연습하며 기다리다가 누가 들어오면 바로 대전</p>
       {resumeRoom && (
         <button className="btn btn-hard" onClick={() => onEnter(resumeRoom)} disabled={busy}>진행 중인 대전으로 돌아가기</button>
       )}
       <div className="account-actions">
         <button className="btn btn-normal account-btn" onClick={() => run(quickMatch)} disabled={busy}>빠른 대전</button>
-        <button className="btn btn-easy account-btn" onClick={() => run(() => createRoom('easy'))} disabled={busy}>방 만들기</button>
+        <button className="btn btn-easy account-btn" onClick={() => run(() => createRoom(false))} disabled={busy}>방 만들기</button>
+        <button className="btn btn-primary account-btn" onClick={() => run(() => createRoom(true))} disabled={busy}>🔒 비밀방 만들기</button>
       </div>
       <div className="room-list" aria-label="열린 방">
         <strong>열린 방 {rooms.length > 0 ? `(${rooms.length})` : ''}</strong>
@@ -341,31 +341,20 @@ function PvpLobby({ onEnter, resumeRoom }) {
         ))}
       </div>
       <form className="account-actions" onSubmit={(e) => { e.preventDefault(); run(() => joinByCode(code.trim())); }}>
-        <input className="code-input" inputMode="numeric" pattern="[0-9]*" maxLength={4} placeholder="방 코드 4자리" value={code} onChange={(e) => setCode(e.target.value.replace(/\D/g, ''))} />
-        <button className="btn btn-primary account-btn" disabled={busy || code.length !== 4}>코드로 입장</button>
+        <input className="code-input" inputMode="numeric" pattern="[0-9]*" maxLength={4} placeholder="비밀방 코드 4자리" value={code} onChange={(e) => setCode(e.target.value.replace(/\D/g, ''))} />
+        <button className="btn btn-primary account-btn" disabled={busy || code.length !== 4}>🔒 비밀방 입장</button>
       </form>
       {err && <span className="account-error">{err}</span>}
     </section>
   );
 }
 
-function Menu({ onStart, onPvp }) {
-  const acc = useContext(AccountContext);
+function RulesModal({ onClose }) {
   return (
-    <div className="screen menu-screen">
-      <AccountBar />
-      <PvpLobby onEnter={onPvp} resumeRoom={acc.activeRoom} />
-      <h1 className="title">IQ 맞고</h1>
-      <p className="subtitle">카드를 뒤집어 같은 월을 찾고, 맞고 규칙으로 점수를 겨루세요!</p>
-      <div className="row">
-        {DIFFICULTIES.map((d) => (
-          <button key={d.key} className={`btn ${d.cls}`} onClick={() => onStart(d.key)}>
-            <span>{d.label}</span>
-            <small>(AI 기억력: {MEMORY_LIMIT[d.key]}장{REVEAL_TURNS[d.key] > 0 && ` · 틀린 카드 ${REVEAL_TURNS[d.key]}턴 유지`})</small>
-          </button>
-        ))}
-      </div>
-      <div className="rules">
+    <div className="rules-modal" role="dialog" aria-label="게임 규칙" onClick={onClose}>
+      <div className="rules-box" onClick={(e) => e.stopPropagation()}>
+        <button className="rules-close" onClick={onClose} aria-label="닫기">✕</button>
+        <div className="rules">
         <h3>게임 규칙</h3>
         <p>• 화투 48장 중 같은 월 2장을 뒤집어 맞추면 가져가고 한 번 더 뒤집을 수 있습니다. 틀리거나, 한 턴에 카드 4장(2번 시도)을 모두 열면 맞췄어도 상대 차례입니다.</p>
         <p>• 시작할 때 <b>카드 4장이 앞면으로 깔려</b> 있어, 먼저 하는 쪽이 불리하지 않도록 두 사람이 한 턴씩 보고 시작합니다. 이긴 편이 다음 판의 선이 됩니다. 깔다가 아이템 패가 나오면 효과 없이 선(먼저 하는 사람)이 그냥 먹고, 일반 카드 4장은 항상 깔립니다.</p>
@@ -376,7 +365,7 @@ function Menu({ onStart, onPvp }) {
         <p>• <b>보너스</b>(상대 피를 가져옴): <b>판쓸</b> 열려 있던 카드를 모두 먹음(+1점도) · <b>쪽</b> 앞면으로 열려 있지 않던 두 장을 뒤집어 바로 짝(첫 번째·두 번째 시도 모두) · <b>폭탄</b> 앞면으로 열린 같은 월 3장이 있을 때 맞춤(피 2장)</p>
         <p>• {WIN_THRESHOLD}점 이상이 되면 <b>턴이 끝날 때</b>(남은 2번의 시도를 모두 마친 뒤) <b>고</b>(계속) 또는 <b>스톱</b>(종료)을 선택합니다. 고를 부르면 <b>상대 차례로 넘어가고</b>, 그 뒤에는 점수가 더 올라야 다시 선택할 수 있습니다.</p>
         <p>• 1고 +1, 2고 +2, 3고부터는 점수가 2배씩! 피박·광박이면 각각 2배</p>
-        <p>• 오른쪽 아래 버튼으로 배경음악과 효과음을 따로 켜고 끌 수 있습니다. 소리는 브라우저에서 직접 만들어 내며, 설정은 기억됩니다.</p>
+        <p>• 화면 위쪽의 소리 버튼으로 배경음악과 효과음을 따로 켜고 끌 수 있습니다. 소리는 브라우저에서 직접 만들어 내며, 설정은 기억됩니다.</p>
         <p>• 모든 카드를 가져갔는데 {WIN_THRESHOLD}점 이상이 없으면 나가리(무승부)</p>
       </div>
       <p className="credits">
@@ -386,6 +375,33 @@ function Menu({ onStart, onPvp }) {
         <a href="https://creativecommons.org/licenses/by-sa/4.0/deed.ko" target="_blank" rel="noreferrer">CC BY-SA 4.0</a>
         {' '}(크기와 색을 변경함)
       </p>
+        <button className="btn btn-primary" onClick={onClose}>닫기</button>
+      </div>
+    </div>
+  );
+}
+
+function Menu({ onStart, onPvp }) {
+  const acc = useContext(AccountContext);
+  const [showRules, setShowRules] = useState(false);
+  return (
+    <div className="screen menu-screen">
+      <h1 className="title">IQ 맞고</h1>
+      <p className="subtitle">카드를 뒤집어 같은 월을 찾고, 맞고 규칙으로 점수를 겨루세요!</p>
+      <div className="row">
+        {DIFFICULTIES.map((d) => (
+          <button key={d.key} className={`btn ${d.cls}`} onClick={() => onStart(d.key)}>
+            <span>{d.label}</span>
+            <small>(AI 기억력: {MEMORY_LIMIT[d.key]}장{REVEAL_TURNS[d.key] > 0 && ` · 틀린 카드 ${REVEAL_TURNS[d.key]}턴 유지`})</small>
+          </button>
+        ))}
+        <button className="btn btn-primary" onClick={() => setShowRules(true)}>
+          <span>📖 게임 규칙</span>
+        </button>
+      </div>
+      <AccountBar />
+      <PvpLobby onEnter={onPvp} resumeRoom={acc.activeRoom} />
+      {showRules && <RulesModal onClose={() => setShowRules(false)} />}
     </div>
   );
 }
@@ -496,7 +512,7 @@ function PracticeWhileWaiting({ room, onCancel }) {
     <>
       <GameView state={state} send={wrapped} onStart={(d) => send({ type: 'START', difficulty: d, first: nextFirst(state) })} settle={null} />
       <div className="wait-pill" role="status">
-        <span>⏳ 상대를 기다리는 중 · 방 코드 <b>{room.code}</b></span>
+        <span>⏳ 상대를 기다리는 중 · {room.private ? <>🔒 비밀방 코드 <b>{room.code}</b></> : '공개방'}</span>
         <button className="account-link" onClick={onCancel}>방 닫기</button>
       </div>
     </>

@@ -64,7 +64,7 @@ describe('사람 대전 화면 연결', () => {
 
   it('대기 중인 방은 연습 판을 보여 주고, 상대가 들어오면 바로 대전 화면으로 바뀐다', async () => {
     setup('alice');
-    await act(async () => roomCb({ status: 'waiting', quick: false, code: '4821', seats: ['alice', ''], names: { A: '앨리스', B: '' }, updatedAt: Date.now() }));
+    await act(async () => roomCb({ status: 'waiting', quick: false, private: true, code: '4821', seats: ['alice', ''], names: { A: '앨리스', B: '' }, updatedAt: Date.now() }));
     expect(screen.getByTestId('practice').textContent).toContain('4821');
     expect(screen.queryByTestId('game')).toBeNull();
     await act(async () => roomCb(mkRoom())); // 누군가 입장해 판이 시작됨

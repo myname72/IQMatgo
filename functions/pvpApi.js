@@ -129,8 +129,8 @@ function startMatch(tx, roomId, room, hostUid, guestUid, hostName, guestName, no
   tx.update(userRef(hostUid), { activeRoom: roomId });
 }
 
-const newRoomData = (uid, name, difficulty, quick, code, now) => ({
-  code, quick, difficulty, status: 'waiting', seats: [uid, ''], names: { A: name, B: '' }, hostUid: uid,
+const newRoomData = (uid, name, difficulty, quick, code, now, secret = false) => ({
+  code, quick, private: secret, difficulty, status: 'waiting', seats: [uid, ''], names: { A: name, B: '' }, hostUid: uid,
   viewJson: '', version: 0, deadline: null, layoutSeed: 0, timeouts: { A: 0, B: 0 }, rematch: { A: false, B: false },
   result: null, money: null, createdAt: now, updatedAt: now,
 });
@@ -141,6 +141,7 @@ const randomCode = () => String(Math.floor(1000 + Math.random() * 9000));
 export const createRoom = onCall(opts, async (req) => {
   const uid = need(req);
   const difficulty = 'easy'; // AI 대전과 같은 규칙(틀린 카드 5턴 유지)만 쓴다
+  const secret = req.data?.private === true; // 비밀방: 목록·빠른 대전에 나오지 않고, 방 코드로만 입장한다
   return db.runTransaction(async (tx) => {
     const me = await loadUser(tx, uid);
     const active = await activeRoomOf(tx, me);
@@ -155,9 +156,9 @@ export const createRoom = onCall(opts, async (req) => {
     if (!code) fail('resource-exhausted', '방 코드를 만들지 못했습니다. 다시 시도해 주세요.');
     const now = Date.now();
     const ref = db.collection('rooms').doc();
-    tx.set(ref, newRoomData(uid, nameOf(me.data()), difficulty, false, code, now));
+    tx.set(ref, newRoomData(uid, nameOf(me.data()), difficulty, false, code, now, secret));
     tx.update(userRef(uid), { activeRoom: ref.id });
-    return { roomId: ref.id, code };
+    return { roomId: ref.id, code: secret ? code : undefined };
   });
 });
 
@@ -170,7 +171,7 @@ export const listRooms = onCall(opts, async (req) => {
   const now = Date.now();
   const snap = await db.collection('rooms').where('status', '==', 'waiting').limit(30).get();
   const rooms = snap.docs
-    .filter((d) => d.data().hostUid !== uid && isAlive(d.data(), now))
+    .filter((d) => d.data().hostUid !== uid && !d.data().private && isAlive(d.data(), now)) // 비밀방은 목록에 나오지 않는다
     .map((d) => ({ id: d.id, host: d.data().names.A, createdAt: d.data().createdAt }))
     .sort((a, b) => b.createdAt - a.createdAt)
     .slice(0, 20);
@@ -212,6 +213,7 @@ export const joinRoom = onCall(opts, async (req) => {
     }
     const room = doc.data();
     if (room.status !== 'waiting') fail('failed-precondition', '이미 대전이 시작된 방입니다.');
+    if (roomIdArg && room.private) fail('permission-denied', '비밀방은 방 코드로만 입장할 수 있습니다.');
     if (room.hostUid === uid) fail('failed-precondition', '내가 만든 방입니다.');
     if (!isAlive(room, Date.now())) fail('not-found', '방장이 자리를 비웠습니다.');
     const host = await loadUser(tx, room.hostUid);
@@ -231,7 +233,7 @@ export const quickMatch = onCall(opts, async (req) => {
     checkEntry(me);
     const now = Date.now();
     const q = await tx.get(db.collection('rooms').where('status', '==', 'waiting').limit(20));
-    const doc = q.docs.find((d) => d.data().hostUid !== uid && isAlive(d.data(), now));
+    const doc = q.docs.find((d) => d.data().hostUid !== uid && !d.data().private && isAlive(d.data(), now));
     if (doc) {
       const room = doc.data();
       const host = await loadUser(tx, room.hostUid);
