@@ -198,4 +198,28 @@ describe('사람 대전 API (인메모리 Firestore)', () => {
     const a = await api.createRoom(req('alice', { private: false }));
     expect(a.code).toBeUndefined();
   });
+
+  it('시작 때 엿보기가 나온 판은 선인 사람에게만 엿보기 정보가 간다', async () => {
+    let found = false;
+    for (let n = 0; n < 200 && !found; n++) {
+      const a = await api.quickMatch(req('alice'));
+      const b = await api.quickMatch(req('bob'));
+      const id = b.roomId;
+      const g = gameOf(id);
+      if (g.itemEvent?.item === 'peek') {
+        found = true;
+        const firstUid = g.turn === 'player' ? 'alice' : 'bob';
+        const otherUid = firstUid === 'alice' ? 'bob' : 'alice';
+        const peek = store.get(`rooms/${id}/peek/${firstUid}`);
+        expect(peek.seed).toBe(room(id).layoutSeed);
+        expect(store.get(`rooms/${id}/peek/${otherUid}`)).toBeUndefined();
+        const cards = JSON.parse(peek.cardsJson);
+        expect(Object.values(cards).every((c) => c.kind !== 'item')).toBe(true);
+      } else {
+        await api.leaveRoom(req('alice', { roomId: id })); // 기권으로 끝내고 다시 시도
+      }
+      expect(a.roomId).toBe(id);
+    }
+    expect(found).toBe(true);
+  });
 });

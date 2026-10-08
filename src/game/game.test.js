@@ -551,4 +551,28 @@ describe('아이템 패', () => {
     }
     expect(seen).toBeGreaterThan(0); // 200판 중 아이템이 나온 판이 있어야 검증이 의미 있다
   });
+
+  it('시작 때 엿보기가 나오면 선에게 효과가 바로 발동한다 (AI 선이면 기억에 반영)', () => {
+    let human = 0;
+    let aiFirst = 0;
+    for (let n = 1; n <= 600; n++) {
+      for (const first of ['player', 'ai']) {
+        const g = createGame('easy', seededRng(n), first);
+        const hasPeek = g.startNote?.items.includes('엿보기');
+        if (!hasPeek) {
+          expect(g.itemEvent).toBeNull();
+          continue;
+        }
+        expect(g.itemEvent).toMatchObject({ n: 1, who: first, item: 'peek' });
+        expect(g.deck[g.itemEvent.index].taken).toBe(true);
+        if (first === 'player') human++;
+        else {
+          aiFirst++;
+          expect(g.memory.length).toBeGreaterThan(g.revealed.length - 1); // 열린 카드 + 엿보기로 안 것
+        }
+      }
+    }
+    expect(human).toBeGreaterThan(0);
+    expect(aiFirst).toBeGreaterThan(0);
+  });
 });

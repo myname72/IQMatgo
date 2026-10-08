@@ -39,7 +39,7 @@ export function watchPeek(roomId, uid, cb) {
   let dead = false;
   load().then((fb) => {
     if (!fb || dead) return;
-    off = fb.F.onSnapshot(fb.F.doc(fb.fs, 'rooms', roomId, 'peek', uid), (s) => s.exists() && cb({ n: s.data().n, cards: JSON.parse(s.data().cardsJson) }), () => {});
+    off = fb.F.onSnapshot(fb.F.doc(fb.fs, 'rooms', roomId, 'peek', uid), (s) => s.exists() && cb({ n: s.data().n, seed: s.data().seed, cards: JSON.parse(s.data().cardsJson) }), () => {});
   });
   return () => {
     dead = true;

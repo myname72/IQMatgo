@@ -40,6 +40,15 @@ async function activeRoomOf(tx, userSnap) {
   return id;
 }
 
+// 시작 때 엿보기가 나왔으면, 선인 사람에게만 닫힌 카드의 절반을 알려 준다
+function writeStartPeek(tx, roomId, game, seatUids, layoutSeed, now) {
+  const ev = game.state.itemEvent;
+  if (!ev || ev.item !== 'peek') return;
+  tx.set(peekRef(roomId, seatUids[seatOf(ev.who) === 'A' ? 0 : 1]), {
+    n: ev.n, seed: layoutSeed, cardsJson: JSON.stringify(peekCardsOf(game.state, secureRng)), at: now,
+  });
+}
+
 // 새 판을 시작할 때 방 문서에 쓰는 값 (공개 상태 + 기한)
 function startPatch(game, now, extra = {}) {
   const layoutSeed = layoutSeedOf();
@@ -124,7 +133,9 @@ const checkEntry = (snap) => {
 function startMatch(tx, roomId, room, hostUid, guestUid, hostName, guestName, now) {
   const game = newGame({ difficulty: room.difficulty, firstSeat: 'A', rng: secureRng });
   tx.set(privRef(roomId), { stateJson: JSON.stringify(game.state), lastFlipAt: 0, timeouts: game.timeouts });
-  tx.update(roomRef(roomId), startPatch(game, now, { seats: [hostUid, guestUid], names: { A: hostName, B: guestName } }));
+  const patch = startPatch(game, now, { seats: [hostUid, guestUid], names: { A: hostName, B: guestName } });
+  tx.update(roomRef(roomId), patch);
+  writeStartPeek(tx, roomId, game, [hostUid, guestUid], patch.layoutSeed, now);
   tx.update(userRef(guestUid), { activeRoom: roomId });
   tx.update(userRef(hostUid), { activeRoom: roomId });
 }
@@ -292,7 +303,7 @@ export const playAction = onCall(opts, async (req) => {
     const ev = next.state.itemEvent;
     if (ev && ev.n !== ctx.game.state.itemEvent?.n && ev.item === 'peek') {
       const who = seatOf(ev.who);
-      tx.set(peekRef(roomId, ctx.seatUid[who]), { n: ev.n, cardsJson: JSON.stringify(peekCardsOf(next.state, secureRng)), at: now });
+      tx.set(peekRef(roomId, ctx.seatUid[who]), { n: ev.n, seed: ctx.room.layoutSeed, cardsJson: JSON.stringify(peekCardsOf(next.state, secureRng)), at: now });
     }
     commit(tx, ctx, next, now);
     return { ok: true };
@@ -335,7 +346,9 @@ export const rematch = onCall(opts, async (req) => {
     const firstSeat = room.result?.winner ? seatOf(room.result.winner) : 'A'; // 이긴 쪽이 선 (비기면 A)
     const game = newGame({ difficulty: room.difficulty, firstSeat, rng: secureRng });
     tx.set(privRef(roomId), { stateJson: JSON.stringify(game.state), lastFlipAt: 0, timeouts: game.timeouts });
-    tx.update(roomRef(roomId), startPatch(game, now));
+    const patch = startPatch(game, now);
+    tx.update(roomRef(roomId), patch);
+    writeStartPeek(tx, roomId, game, [seatUid.A, seatUid.B], patch.layoutSeed, now);
     tx.update(userRef(seatUid.A), { activeRoom: roomId });
     tx.update(userRef(seatUid.B), { activeRoom: roomId });
     return { started: true };

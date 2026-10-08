@@ -99,7 +99,7 @@ export default function PvpRoom({ roomId, uid, Game, Practice, onExit, useGameSo
         remote={{
           names,
           deadline: room.deadline,
-          peekDeck: peek && view.itemEvent?.item === 'peek' && peek.n === view.itemEvent.n ? peek.cards : null,
+          peekDeck: peek && view.itemEvent?.item === 'peek' && peek.n === view.itemEvent.n && peek.seed === view.seed ? peek.cards : null,
           onRematch: () => rematch(roomId).catch((e) => setNotice(messageOf(e))),
           rematchSent: Boolean(rematchVotes[mySeat]),
           opponentWantsRematch: Boolean(rematchVotes[mySeat === 'A' ? 'B' : 'A']),

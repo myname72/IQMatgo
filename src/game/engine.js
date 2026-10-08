@@ -29,19 +29,21 @@ export function createGame(difficulty, rng = Math.random, first = 'player') {
   const startOpen = [];
   const startItems = [];
   const taken = new Set();
+  let peekSlot = null; // 시작 때 엿보기가 나온 칸
   const order = shuffle(dealt.map((_, k) => k), rng); // 판 위 무작위 위치에서 뽑는다
   for (const i of order) {
     if (startOpen.length >= START_OPEN) break;
     if (isItem(dealt[i].card)) {
       startItems.push(dealt[i].card);
       taken.add(i);
+      if (dealt[i].card.item === 'peek') peekSlot = i;
     } else {
       startOpen.push(i);
     }
   }
   const deck = dealt.map((d, i) => (taken.has(i) ? { ...d, taken: true } : d));
   const openTurns = Math.max(REVEAL_TURNS[difficulty] ?? 0, 2); // 최소 한 사람당 한 턴은 볼 수 있다
-  return {
+  const state = {
     phase: 'playing', // playing | gostop | over
     difficulty,
     seed: Math.floor(rng() * 2 ** 31), // 판 위 카드의 흐트러진 배치용 (게임 중 고정)
@@ -67,6 +69,12 @@ export function createGame(difficulty, rng = Math.random, first = 'player') {
     message: first === 'player' ? `카드 ${START_OPEN}장이 앞면으로 깔려 있습니다. 당신의 턴입니다!` : `카드 ${START_OPEN}장이 앞면으로 깔려 있습니다. AI가 먼저 시작합니다.`,
     result: null,
   };
+  // 시작 때 엿보기가 나오면 선에게 효과가 바로 발동한다 (쌍피·쓰리피는 피로 계산되고, 섞기·초기화는 시작 판에서 의미가 없어 효과 없음)
+  if (peekSlot !== null) {
+    state.itemEvent = { n: 1, who: first, item: 'peek', index: peekSlot, picks: [] };
+    if (first === 'ai') state.memory = aiPeekMemory(state, rng);
+  }
+  return state;
 }
 
 export const scoreOf = (state, who) => calculateScore(state.captured[who]) + (state.bonus?.[who] ?? 0);
