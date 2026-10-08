@@ -66,6 +66,7 @@ export function createGame(difficulty, rng = Math.random, first = 'player') {
     pendingTurnEnd: null,
     rewardEvent: null,
     bonus: { player: 0, ai: 0 },
+    turnMonths: [], // 이번 턴에 짝을 맞춰 먹은 월들 (폭탄 판정용, 턴이 넘어가면 비운다)
     message: first === 'player' ? `카드 ${START_OPEN}장이 앞면으로 깔려 있습니다. 당신의 턴입니다!` : `카드 ${START_OPEN}장이 앞면으로 깔려 있습니다. AI가 먼저 시작합니다.`,
     result: null,
   };
@@ -291,8 +292,9 @@ export function resolveFlip(state) {
   const rewards = [];
   if (state.revealed.length > 0 && next.revealed.length === 0) rewards.push({ kind: 'sweep', label: '판쓸', pi: 1, bonus: 1 });
   if (!state.revealed.includes(i) && !state.revealed.includes(j)) rewards.push({ kind: 'jjok', label: '쪽', pi: 1 });
-  // 폭탄: 같은 월 4장을 모두 내가 먹었을 때 (이번 짝으로 네 장이 모두 내 패가 됨)
-  if (next.captured[who].filter((c) => c.month === a.month).length >= 4) rewards.push({ kind: 'bomb', label: '폭탄', pi: 2 });
+  // 폭탄: 한 턴에 같은 월 4장을 모두 먹었을 때 (같은 월 짝을 이번 턴에 두 번 맞춤)
+  next.turnMonths = [...(state.turnMonths ?? []), a.month];
+  if (next.turnMonths.filter((m) => m === a.month).length >= 2) rewards.push({ kind: 'bomb', label: '폭탄', pi: 2 });
   if (rewards.length) {
     const r = applyRewards(next, who, rewards);
     Object.assign(next, r.state, {
@@ -382,6 +384,7 @@ function passTurn(state, reason, tick = true) {
     ...state,
     phase: 'playing',
     pendingTurnEnd: null,
+    turnMonths: [],
     flipped: [],
     revealed,
     revealLeft,

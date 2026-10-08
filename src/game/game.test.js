@@ -504,25 +504,45 @@ describe('아이템 패', () => {
     expect(g.captured.ai).toHaveLength(2);
   });
 
-  it('폭탄: 같은 월 4장을 모두 내가 먹으면 피 2장 (3장이 열려 있는 것만으로는 아니다)', () => {
+  it('폭탄: 한 턴에 같은 월 두 쌍(4장)을 연속으로 맞출 때만 터진다', () => {
     const idx = (g, m) => g.deck.map((s, k) => (s.card.month === m ? k : -1)).filter((k) => k >= 0);
-    // 내가 이미 4월 두 장을 먹은 상태에서 나머지 두 장을 맞추면 폭탄
     let g = cleanGame('easy');
-    g.captured.ai = fill('pi', 4);
-    g.captured.player = g.deck.filter((s) => s.card.month === 4).slice(0, 2).map((s) => s.card);
-    const cards = idx(g, 4);
-    g.deck = g.deck.map((s, k) => (k === cards[0] || k === cards[1] ? { ...s, taken: true } : s));
-    g = resolveFlip(flipCard(flipCard(g, cards[2]), cards[3]));
+    g.captured.ai = fill('pi', 6);
+    const c = idx(g, 4);
+    g = resolveFlip(flipCard(flipCard(g, c[0]), c[1])); // 첫 번째 시도: 4월 한 쌍
+    expect(g.rewardEvent?.rewards.map((r) => r.kind) ?? []).not.toContain('bomb');
+    expect(g.turn).toBe('player');
+    g = resolveFlip(flipCard(flipCard(g, c[2]), c[3])); // 두 번째 시도: 4월 나머지 한 쌍 → 폭탄
     expect(g.rewardEvent.rewards.map((r) => r.kind)).toContain('bomb');
-    expect(g.rewardEvent.stolen.length).toBeGreaterThanOrEqual(2); // 폭탄은 피 2장 (쪽 등이 겹치면 더)
-    // 같은 월 카드 3장이 앞면으로 열려 있어도, 먹은 게 2장뿐이면 폭탄이 아니다
+    expect(g.rewardEvent.stolen.length).toBeGreaterThanOrEqual(2);
+  });
+
+  it('폭탄: 다른 월을 사이에 맞췄거나, 턴이 달라지면 터지지 않는다', () => {
+    const idx = (g, m) => g.deck.map((s, k) => (s.card.month === m ? k : -1)).filter((k) => k >= 0);
+    // 같은 턴이라도 다른 월 짝 뒤에는 4장이 안 된다
+    let g = cleanGame('easy');
+    g.captured.ai = fill('pi', 6);
+    const a = idx(g, 4);
+    const b = idx(g, 5);
+    g = resolveFlip(flipCard(flipCard(g, a[0]), a[1]));
+    g = resolveFlip(flipCard(flipCard(g, b[0]), b[1]));
+    expect(g.rewardEvent?.rewards.map((r) => r.kind) ?? []).not.toContain('bomb');
+    // 이전 턴에 먹은 4월 한 쌍이 있어도, 새 턴에 나머지 한 쌍을 맞추면 폭탄이 아니다
     let h = cleanGame('easy');
-    h.captured.ai = fill('pi', 4);
-    const c5 = idx(h, 5);
-    h.revealed = c5.slice(0, 3);
-    h.revealLeft = Object.fromEntries(h.revealed.map((k) => [k, 3]));
-    h = resolveFlip(flipCard(flipCard(h, c5[0]), c5[1]));
+    h.captured.ai = fill('pi', 6);
+    h.captured.player = h.deck.filter((s) => s.card.month === 4).slice(0, 2).map((s) => s.card);
+    const c = idx(h, 4);
+    h.deck = h.deck.map((s, k) => (k === c[0] || k === c[1] ? { ...s, taken: true } : s));
+    h = resolveFlip(flipCard(flipCard(h, c[2]), c[3]));
     expect(h.rewardEvent?.rewards.map((r) => r.kind) ?? []).not.toContain('bomb');
+    // 3장이 앞면으로 열려 있기만 해도 아니다
+    let k = cleanGame('easy');
+    k.captured.ai = fill('pi', 6);
+    const d = idx(k, 6);
+    k.revealed = d.slice(0, 3);
+    k.revealLeft = Object.fromEntries(k.revealed.map((x) => [x, 3]));
+    k = resolveFlip(flipCard(flipCard(k, d[0]), d[1]));
+    expect(k.rewardEvent?.rewards.map((r) => r.kind) ?? []).not.toContain('bomb');
   });
 
   it('선을 AI로 정하면 AI가 먼저 시작하고 시작 아이템도 AI가 먹는다', () => {
