@@ -49,11 +49,14 @@ describe('점수 계산', () => {
     expect(calculateScore([...fill('pi', 8), ...fill('ssangpi', 1)])).toBe(1);
   });
   it('고/박 배수', () => {
+    // 고 1번마다 +1점, 3고부터 고마다 2배씩: (점수 + 고 횟수) × 배수
     expect(applyGo(7, 0)).toBe(7);
-    expect(applyGo(7, 1)).toBe(8);
-    expect(applyGo(7, 2)).toBe(9);
-    expect(applyGo(7, 3)).toBe(18);
-    expect(applyGo(7, 4)).toBe(36);
+    expect(applyGo(7, 1)).toBe(8); // 7+1
+    expect(applyGo(7, 2)).toBe(9); // 7+2
+    expect(applyGo(7, 3)).toBe(20); // (7+3)×2
+    expect(applyGo(7, 4)).toBe(44); // (7+4)×4
+    expect(applyGo(7, 5)).toBe(96); // (7+5)×8
+    expect(applyGo(21, 4)).toBe(100); // 실제 판 예시
     const winner = [...fill('gwang', 3), ...fill('pi', 10)];
     const p = finalPayout(winner, [], 0);
     expect(p.pibak && p.gwangbak).toBe(true);
@@ -94,6 +97,11 @@ describe('점수 계산', () => {
     expect(p.multiplier).toBe(8);
     expect(p.goBonus).toBe(2);
     expect(p.total).toBe((p.base + 2) * 8);
+    // 3고 이상이면 고 점수도 고 횟수만큼 붙고 배수가 곱해진다
+    const q = finalPayout(winner, [], 4);
+    expect(q.goBonus).toBe(4);
+    expect(q.goMultiplier).toBe(4);
+    expect(q.total).toBe((q.base + 4) * 4 * 4); // 피박·광박 4배까지
   });
 });
 

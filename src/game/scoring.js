@@ -60,12 +60,13 @@ export function calculateScore(cards) {
   return scoreItems(cards).reduce((sum, item) => sum + item.points, 0);
 }
 
-// 고 횟수 보너스: 1고 +1, 2고 +2, 3고부터 2배씩
+// 고 보너스: 고를 한 번 부를 때마다 +1점, 3고부터는 고마다 점수가 2배씩
+// 예) 4고 = (점수 + 4) × 4배, 5고 = (점수 + 5) × 8배
+export const goMultiplierOf = (goCount) => (goCount >= 3 ? 2 ** (goCount - 2) : 1);
+
 export function applyGo(score, goCount) {
   if (goCount <= 0) return score;
-  let result = score + Math.min(goCount, 2);
-  if (goCount >= 3) result *= 2 ** (goCount - 2);
-  return result;
+  return (score + goCount) * goMultiplierOf(goCount);
 }
 
 // 맞고 정석 기준값
@@ -89,8 +90,8 @@ export function finalPayout(winnerCards, loserCards, goCount, bonus = 0, loserGo
   if (bonus) items.push({ key: 'bonus', label: '판쓸 보너스', points: bonus });
   const base = calculateScore(winnerCards) + bonus;
   const withGo = applyGo(base, goCount);
-  const goBonus = goCount > 0 ? Math.min(goCount, 2) : 0; // 1고 +1, 2고 이상 +2
-  const goMultiplier = goCount >= 3 ? 2 ** (goCount - 2) : 1; // 3고 ×2, 4고 ×4, 5고 ×8 …
+  const goBonus = Math.max(goCount, 0); // 고 1번마다 +1점
+  const goMultiplier = goMultiplierOf(goCount); // 3고 ×2, 4고 ×4, 5고 ×8 …
   const bak = detectBak(winnerCards, loserCards, loserGo);
   const w = summarize(winnerCards);
   const l = summarize(loserCards);
