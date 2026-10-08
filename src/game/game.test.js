@@ -59,6 +59,42 @@ describe('점수 계산', () => {
     expect(p.pibak && p.gwangbak).toBe(true);
     expect(p.total).toBe(p.base * 4);
   });
+
+  it('피박: 맞고 기준으로 상대 피 7장 이하일 때만', () => {
+    const winner = [...fill('pi', 10), ...byName('송학광')]; // 피로 점수를 냈고 광은 1장(광박 아님)
+    expect(finalPayout(winner, fill('pi', 7), 0).pibak).toBe(true);
+    expect(finalPayout(winner, fill('pi', 8), 0).pibak).toBe(false);
+    // 승자가 피로 점수를 못 내면(피 9장 이하) 피박이 아니다
+    expect(finalPayout([...fill('pi', 9), ...byName('송학광')], fill('pi', 3), 0).pibak).toBe(false);
+  });
+
+  it('멍따: 열끗 7장 이상이면 2배', () => {
+    const animals = HWATU_CARDS.filter((c) => c.kind === 'animal');
+    const six = finalPayout(animals.slice(0, 6), [], 0);
+    expect(six.mungtta).toBe(false);
+    expect(six.total).toBe(six.base);
+    const seven = finalPayout(animals.slice(0, 7), [], 0);
+    expect(seven.mungtta).toBe(true);
+    expect(seven.total).toBe(seven.base * 2);
+  });
+
+  it('고박: 고를 부른 쪽이 지면 이긴 쪽 점수가 2배', () => {
+    const winner = [...byName('송학광', '벚꽃광'), ...fill('ribbon', 5)];
+    const plain = finalPayout(winner, [], 0, 0, 0);
+    const gobak = finalPayout(winner, [], 0, 0, 2); // 상대가 2고를 부르고 졌다
+    expect(plain.gobak).toBe(false);
+    expect(gobak.gobak).toBe(true);
+    expect(gobak.total).toBe(plain.total * 2);
+  });
+
+  it('박이 겹치면 배수가 곱해지고 계산 과정이 함께 나온다', () => {
+    const winner = [...fill('gwang', 3), ...fill('pi', 10)]; // 피박 + 광박
+    const p = finalPayout(winner, [], 2, 0, 1); // 2고 + 고박
+    expect(p.multipliers.map((m) => m.key)).toEqual(['pibak', 'gwangbak', 'gobak']);
+    expect(p.multiplier).toBe(8);
+    expect(p.goBonus).toBe(2);
+    expect(p.total).toBe((p.base + 2) * 8);
+  });
 });
 
 describe('게임 진행', () => {

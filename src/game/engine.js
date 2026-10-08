@@ -225,6 +225,7 @@ function finish(state, winner, how) {
     state.captured[other(winner)],
     state.goCount[winner],
     state.bonus?.[winner] ?? 0,
+    state.goCount[other(winner)], // 고박: 진 쪽이 고를 불렀으면 점수 2배
   );
   return {
     ...state,

@@ -68,25 +68,39 @@ export function applyGo(score, goCount) {
   return result;
 }
 
-// 박 판정 (승자 기준)
-export function detectBak(winnerCards, loserCards) {
+// 맞고 정석 기준값
+export const PIBAK_PI = 7; // 패자 피가 이 장수 이하이면 피박 (3인 고스톱은 5장, 1:1 맞고는 7장)
+export const MUNGTTA_ANIMALS = 7; // 승자 열끗이 이 장수 이상이면 멍따(멍박)
+
+// 박 판정 (승자 기준). loserGo 는 진 쪽이 부른 고 횟수 (고박 판정용)
+export function detectBak(winnerCards, loserCards, loserGo = 0) {
   const w = summarize(winnerCards);
   const l = summarize(loserCards);
-  const pibak = w.piCount >= 10 && l.piCount <= 5;
-  const gwangbak = w.gwang.length >= 3 && l.gwang.length === 0;
-  return { pibak, gwangbak };
+  return {
+    pibak: w.piCount >= 10 && l.piCount <= PIBAK_PI, // 피로 점수를 낸 승자 + 피 적은 패자
+    gwangbak: w.gwang.length >= 3 && l.gwang.length === 0, // 광으로 점수를 낸 승자 + 광 0장 패자
+    mungtta: w.animals.length >= MUNGTTA_ANIMALS, // 멍따(멍박)
+    gobak: loserGo > 0, // 고를 부른 쪽이 역전당해 짐
+  };
 }
 
-export function finalPayout(winnerCards, loserCards, goCount, bonus = 0) {
+export function finalPayout(winnerCards, loserCards, goCount, bonus = 0, loserGo = 0) {
   const items = scoreItems(winnerCards);
   if (bonus) items.push({ key: 'bonus', label: '판쓸 보너스', points: bonus });
   const base = calculateScore(winnerCards) + bonus;
   const withGo = applyGo(base, goCount);
   const goBonus = goCount > 0 ? Math.min(goCount, 2) : 0; // 1고 +1, 2고 이상 +2
   const goMultiplier = goCount >= 3 ? 2 ** (goCount - 2) : 1; // 3고 ×2, 4고 ×4, 5고 ×8 …
-  const { pibak, gwangbak } = detectBak(winnerCards, loserCards);
-  const multiplier = (pibak ? 2 : 1) * (gwangbak ? 2 : 1);
+  const bak = detectBak(winnerCards, loserCards, loserGo);
+  const w = summarize(winnerCards);
   const l = summarize(loserCards);
+  // 박은 모두 2배이고 겹치면 곱해진다 (피박×광박 = 4배)
+  const multipliers = [];
+  if (bak.pibak) multipliers.push({ key: 'pibak', label: '피박', x: 2, note: `상대 피 ${l.piCount}장 (${PIBAK_PI}장 이하)` });
+  if (bak.gwangbak) multipliers.push({ key: 'gwangbak', label: '광박', x: 2, note: '상대가 광을 한 장도 못 먹음' });
+  if (bak.mungtta) multipliers.push({ key: 'mungtta', label: '멍따', x: 2, note: `열끗 ${w.animals.length}장 (${MUNGTTA_ANIMALS}장 이상)` });
+  if (bak.gobak) multipliers.push({ key: 'gobak', label: '고박', x: 2, note: `상대가 ${loserGo}고를 부르고 짐` });
+  const multiplier = multipliers.reduce((m, x) => m * x.x, 1);
   return {
     items,
     base,
@@ -94,10 +108,12 @@ export function finalPayout(winnerCards, loserCards, goCount, bonus = 0) {
     withGo,
     goBonus,
     goMultiplier,
-    pibak,
-    gwangbak,
+    ...bak,
+    multipliers,
+    multiplier,
     loserPi: l.piCount,
     loserGwang: l.gwang.length,
+    loserGo,
     total: withGo * multiplier,
   };
 }

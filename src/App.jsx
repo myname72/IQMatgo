@@ -388,7 +388,8 @@ function RulesModal({ onClose }) {
         <p>• 열끗·띠는 5장부터 1점(이후 1장당 +1), 피는 10장부터 1점(쌍피는 2장으로 계산)</p>
         <p>• <b>보너스</b>(상대 피를 가져옴): <b>판쓸</b> 열려 있던 카드를 모두 먹음(+1점도) · <b>쪽</b> 앞면으로 열려 있지 않던 두 장을 뒤집어 바로 짝(첫 번째·두 번째 시도 모두) · <b>폭탄</b> 한 턴에 같은 월 4장을 모두 먹었을 때(같은 월 짝을 연속으로 두 번, 피 2장)</p>
         <p>• {WIN_THRESHOLD}점 이상이 되면 <b>턴이 끝날 때</b>(남은 2번의 시도를 모두 마친 뒤) <b>고</b>(계속) 또는 <b>스톱</b>(종료)을 선택합니다. 고를 부르면 <b>상대 차례로 넘어가고</b>, 그 뒤에는 점수가 더 올라야 다시 선택할 수 있습니다.</p>
-        <p>• 1고 +1, 2고 +2, 3고부터는 점수가 2배씩! 피박·광박이면 각각 2배</p>
+        <p>• <b>고 점수</b>: 1고 +1점, 2고 +2점, 3고부터는 점수가 2배씩(3고 ×2, 4고 ×4, 5고 ×8). 예) 21점에서 4고 → (21+2)×4 = 92점</p>
+        <p>• <b>박</b>(각각 2배, 겹치면 곱해집니다): <b>피박</b> 내가 피로 점수를 냈고 상대 피가 7장 이하 · <b>광박</b> 내가 3광 이상이고 상대 광이 0장 · <b>멍따</b> 내가 열끗 7장 이상 · <b>고박</b> 고를 부른 상대가 역전당해 짐</p>
         <p>• 화면 위쪽의 소리 버튼으로 배경음악과 효과음을 따로 켜고 끌 수 있습니다. 소리는 브라우저에서 직접 만들어 내며, 설정은 기억됩니다.</p>
         <p>• 모든 카드를 가져갔는데 {WIN_THRESHOLD}점 이상이 없으면 나가리(무승부)</p>
       </div>
@@ -828,18 +829,17 @@ function Game({ state, send, onStart, settle, remote, remoteEnter }) {
                 <b>{r.withGo}점</b>
               </div>
             )}
-            {r.pibak && (
-              <div className="payout-line"><span>피박 (상대 피 {r.loserPi}장)</span><b>×2</b></div>
-            )}
-            {r.gwangbak && (
-              <div className="payout-line"><span>광박 (상대 광 {r.loserGwang}장)</span><b>×2</b></div>
-            )}
+            {(r.multipliers ?? []).map((m) => (
+              <div className="payout-line payout-step" key={m.key}>
+                <span>{m.label} <small>{m.note}</small></span>
+                <b>×{m.x}</b>
+              </div>
+            ))}
             <div className="payout-total"><span>합계</span><b>{r.total}점</b></div>
             <p className="payout-formula">
               계산: {r.goBonus > 0 ? `(${r.base} + ${r.goBonus})` : r.base}
               {r.goMultiplier > 1 ? ` × ${r.goMultiplier}(${r.goCount}고)` : ''}
-              {r.pibak ? ' × 2(피박)' : ''}
-              {r.gwangbak ? ' × 2(광박)' : ''} = {r.total}점
+              {(r.multipliers ?? []).map((m) => ` × ${m.x}(${m.label})`).join('')} = {r.total}점
             </p>
           </section>
         )}
