@@ -464,6 +464,26 @@ body:has(.lobby) { background: radial-gradient(130% 70% at 50% 0%, #11505a 0%, #
 .payout-item small, .payout-step small { display: block; font-size: 0.72rem; opacity: 0.65; font-weight: 400; line-height: 1.3; }
 .payout-step span { max-width: 75%; }
 .payout-formula { margin-top: 6px; font-size: 0.82rem; opacity: 0.8; text-align: right; font-variant-numeric: tabular-nums; }
-/* 앞면 카드끼리 짝이 안 맞아 고를 수 없는 카드 */
-.slot-face.blocked { filter: grayscale(0.75) brightness(0.62); cursor: not-allowed; }
-.back-card.blocked { filter: brightness(0.55); cursor: not-allowed; }
+/* 앞면 카드끼리 짝이 안 맞아 고를 수 없는 카드: 그림은 알아볼 수 있게 두고 테두리로 표시 */
+.slot-face.blocked, .back-card.blocked { cursor: not-allowed; position: relative; }
+.slot-face.blocked { filter: grayscale(0.3) brightness(0.9); }
+.back-card.blocked { filter: brightness(0.82); }
+.slot-face.blocked::after, .back-card.blocked::after {
+  content: ''; position: absolute; inset: 0; border-radius: inherit; pointer-events: none;
+  border: 2px dashed rgba(255,255,255,0.45);
+  background: repeating-linear-gradient(135deg, rgba(10,16,32,0.26) 0 5px, rgba(10,16,32,0.05) 5px 10px);
+}
+
+/* 카드 월 표시: 작은 화면에서 흑싸리(4월)·홍싸리(7월)처럼 비슷한 그림을 구별하기 위한 것 */
+.card-face { position: relative; display: block; width: 100%; height: 100%; }
+.month-badge {
+  position: absolute; left: 3%; bottom: 3%; display: flex; align-items: center; gap: 0.12em;
+  padding: 0.05em 0.3em; border-radius: 0.5em; color: #fff; font-style: normal;
+  font: 800 clamp(8px, 26cqw, 15px)/1.25 'Noto Serif KR', serif;
+  border: 1px solid rgba(255,255,255,0.75); box-shadow: 0 1px 3px rgba(0,0,0,0.6);
+  letter-spacing: -0.02em; pointer-events: none;
+}
+.month-badge em { font-style: normal; font-size: 0.8em; opacity: 0.9; }
+.slot, .peek-face, .mini, .item-pop-card, .item-toast-card { container-type: inline-size; }
+/* 먹은 패는 겹쳐 쌓이므로 월 표시를 숨긴다 */
+.mini .month-badge { display: none; }
