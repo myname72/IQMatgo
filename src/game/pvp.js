@@ -29,6 +29,7 @@ export function swapSides(view) {
   v.turn = flip(view.turn);
   v.first = flip(view.first);
   if (view.turnEvent) v.turnEvent = { ...view.turnEvent, to: flip(view.turnEvent.to) };
+  if (view.startNote) v.startNote = { ...view.startNote, who: flip(view.startNote.who) };
   if (view.itemEvent) v.itemEvent = { ...view.itemEvent, who: flip(view.itemEvent.who) };
   if (view.rewardEvent) v.rewardEvent = { ...view.rewardEvent, who: flip(view.rewardEvent.who) };
   if (view.result) v.result = { ...view.result, winner: flip(view.result.winner) };

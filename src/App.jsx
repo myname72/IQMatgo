@@ -676,6 +676,18 @@ function Game({ state, send, onStart, settle, remote, remoteEnter }) {
   const peekN = state?.itemEvent?.item === 'peek' && state.itemEvent.who === 'player' ? state.itemEvent.n : 0;
   const [peekPhase, setPeekPhase] = useState(null); // null | 'wait'(연출 중) | 'show'(카드 공개)
   const [peekSet, setPeekSet] = useState(null); // 혼자 하는 판에서 엿보기로 보이는 카드 위치
+  // 시작할 때 아이템 패가 나와 선이 먹었다면 잠깐 알려 준다 (판 한 칸이 비어 있는 이유)
+  const startKey = state?.startNote ? state.seed : null;
+  const [startToastKey, setStartToastKey] = useState(null);
+  useEffect(() => {
+    if (startKey === null) {
+      setStartToastKey(null);
+      return undefined;
+    }
+    setStartToastKey(startKey);
+    const t = setTimeout(() => setStartToastKey(null), 4500);
+    return () => clearTimeout(t);
+  }, [startKey]);
   useEffect(() => {
     if (!peekN) {
       setPeekPhase(null);
@@ -854,6 +866,11 @@ function Game({ state, send, onStart, settle, remote, remoteEnter }) {
         </div>
       </div>
 
+      {startKey !== null && startToastKey === startKey && (
+        <div className="start-toast" role="status">
+          🎴 시작할 때 <b>{state.startNote.items.join(', ')}</b> 카드가 나와 선({state.startNote.who === 'player' ? myName : opp})이 먹었습니다
+        </div>
+      )}
       {state.turnEvent && turnToastN === state.turnEvent.n && <TurnBanner event={state.turnEvent} />}
 
       <CapturedPanel who="ai" title={opp} cards={state.captured.ai} score={aiScore} goCount={state.goCount.ai} active={state.turn === 'ai'} />

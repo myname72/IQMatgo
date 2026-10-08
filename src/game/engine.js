@@ -53,6 +53,7 @@ export function createGame(difficulty, rng = Math.random, first = 'player') {
     turnEvent: { n: 1, to: first, reason: 'start' },
     tries: 0, // 이번 턴에 사용한 시도 횟수
     first, // 이번 판의 선
+    startNote: startItems.length ? { who: first, items: startItems.map((c) => c.name) } : null, // 시작 때 선이 먹은 아이템 (화면 안내용)
     captured: first === 'player' ? { player: startItems, ai: [] } : { player: [], ai: startItems },
     lastHidden: [], // 방금 뒷면으로 돌아간 카드 위치 (판에서 반짝여 알려준다)
     revealed: startOpen, // 앞면으로 남아 있는 카드 위치 (시작 때 깔아 둔 카드 + 틀린 뒤 남은 카드)

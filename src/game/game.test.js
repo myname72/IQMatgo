@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest';
+import { seededRng } from './rng.js';
 import { HWATU_CARDS, ITEM_CARDS } from './cards.js';
 import { calculateScore, scoreItems, applyGo, finalPayout } from './scoring.js';
 import { peekSubset, PEEK_VIEW_MS, START_OPEN, MEMORY_LIMIT, REVEAL_TURNS, AUTO_STOP_REMAINING, MAX_TRIES, createGame, flipCard, resolveFlip, declareGo, declareStop, aiChooseFlip, scoreOf } from './engine.js';
@@ -534,5 +535,20 @@ describe('아이템 패', () => {
     expect(sub).toHaveLength(Math.floor(closed / 2));
     expect(sub.every((i) => g.deck[i].card.kind !== 'item' && !g.deck[i].taken && i !== open)).toBe(true);
     expect(new Set(sub).size).toBe(sub.length);
+  });
+
+  it('시작 때 선이 먹은 아이템이 있으면 startNote 로 알려 준다', () => {
+    let seen = 0;
+    for (let n = 1; n <= 200; n++) {
+      const g = createGame('easy', seededRng(n), n % 2 ? 'player' : 'ai');
+      const took = g.captured[g.first];
+      if (took.length > 0) {
+        seen++;
+        expect(g.startNote).toEqual({ who: g.first, items: took.map((c) => c.name) });
+      } else {
+        expect(g.startNote).toBeNull();
+      }
+    }
+    expect(seen).toBeGreaterThan(0); // 200판 중 아이템이 나온 판이 있어야 검증이 의미 있다
   });
 });
