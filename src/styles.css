@@ -365,3 +365,7 @@ body:has(.burst-bomb) #root { animation: bomb-shake 0.6s ease-out; }
 .email-tabs { display: flex; gap: 6px; }
 .email-tabs button { flex: 1; padding: 0.4rem; border-radius: 10px; border: 0; cursor: pointer; background: rgba(255,255,255,0.1); color: #fff; font: inherit; font-weight: 700; }
 .email-tabs button.on { background: rgba(255,226,122,0.25); color: #ffe27a; }
+
+.settle-line { text-align: center; font-size: 0.95rem; opacity: 0.85; }
+.settle-line.earned { color: #ffe27a; font-weight: 900; opacity: 1; font-size: 1.1rem; }
+.net-toast { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); z-index: 40; padding: 10px 16px; border-radius: 12px; background: rgba(14,20,40,0.96); border: 1px solid #ffd84d; font-size: 0.9rem; max-width: 90vw; text-align: center; }

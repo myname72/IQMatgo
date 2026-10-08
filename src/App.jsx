@@ -2,7 +2,12 @@ import { useEffect, useLayoutEffect, useReducer, useRef, useState, useSyncExtern
 import { RotateCcw, Trophy, Hand, Music, Volume2, VolumeX } from 'lucide-react';
 import * as audio from './audio/audio.js';
 import CardFace from './components/CardFace.jsx';
+import { createContext, useContext } from 'react';
 import { useAccount } from './firebase/useAccount.js';
+import { settleAiGameOnServer, startAiGameOnServer } from './firebase/wallet.js';
+import { seededRng } from './game/rng.js';
+
+const AccountContext = createContext(null);
 import { ITEM_CARDS, ITEM_INFO } from './game/cards.js';
 import { WIN_THRESHOLD, scoreItems } from './game/scoring.js';
 import {
@@ -216,7 +221,7 @@ function EmailForm({ acc, onDone }) {
 }
 
 function AccountBar() {
-  const acc = useAccount();
+  const acc = useContext(AccountContext);
   const [open, setOpen] = useState(false);
   if (acc.status === 'off') return null;
   return (
@@ -252,6 +257,16 @@ function AccountBar() {
       {acc.error && <span className="account-error">{acc.error}</span>}
     </div>
   );
+}
+
+function SettleLine({ settle, winner }) {
+  let text;
+  if (settle.status === 'pending') text = '포인트 정산 중…';
+  else if (settle.status === 'error') text = '포인트 정산에 실패했습니다. (이 판은 반영되지 않습니다)';
+  else if (settle.earned > 0) text = `🪙 +${settle.earned.toLocaleString()} 포인트 (오늘 AI 대전 ${settle.earnedToday.toLocaleString()} / ${settle.dailyCap.toLocaleString()})`;
+  else if (winner === 'player') text = `오늘 AI 대전 포인트 상한(${settle.dailyCap.toLocaleString()})에 도달해 더 받지 못했습니다.`;
+  else text = '이긴 판에서만 포인트를 받습니다. (져도 포인트는 줄지 않아요)';
+  return <p className={`settle-line ${settle.earned > 0 ? 'earned' : ''}`}>{text}</p>;
 }
 
 function Menu({ onStart }) {
@@ -367,17 +382,65 @@ function useGameSounds(state) {
 function appReducer(state, action) {
   if (action.type === 'MENU') return null;
   if (action.type === 'START') {
-    // 이긴 편이 다음 판의 선이 된다 (비기면 이전 선 유지)
-    const first = state?.phase === 'over' ? (state.result?.winner ?? state.first ?? 'player') : 'player';
-    return createGame(action.difficulty, Math.random, first);
+    // 서버가 시드를 준 판(gameId)은 같은 시드로 만들고, 조작 기록(log)을 남겨 정산에 쓴다
+    const rng = action.seed ? seededRng(action.seed) : Math.random;
+    const game = createGame(action.difficulty, rng, action.first ?? 'player');
+    return action.gameId ? { ...game, gameId: action.gameId, log: [] } : game;
   }
   if (state === null) return state;
-  return gameReducer(state, action);
+  const next = gameReducer(state, action);
+  if (state.gameId && next !== state && LOGGED.has(action.type)) {
+    return { ...next, log: [...state.log, action.type === 'FLIP' ? { type: 'FLIP', index: action.index } : { type: action.type }] };
+  }
+  return next;
 }
+const LOGGED = new Set(['FLIP', 'RESOLVE', 'GO', 'STOP']);
+
+// 이긴 편이 다음 판의 선이 된다 (비기면 이전 선 유지)
+const nextFirst = (state) => (state?.phase === 'over' ? (state.result?.winner ?? state.first ?? 'player') : 'player');
 
 // state === null 이면 메뉴 화면
 export default function App() {
   const [state, send] = useReducer(appReducer, null);
+  const account = useAccount();
+  const [notice, setNotice] = useState('');
+  const [settle, setSettle] = useState(null); // 정산 결과: {status:'pending'|'done'|'error', ...}
+
+  // 판 시작: 로그인했으면 서버에서 시드를 받아 포인트 정산이 가능한 판으로 시작한다.
+  // 서버가 안 되면 포인트 없이 연습 판으로 시작한다.
+  const startingRef = useRef(false);
+  const startGame = async (difficulty) => {
+    if (startingRef.current) return;
+    startingRef.current = true;
+    const first = nextFirst(state);
+    setSettle(null);
+    setNotice('');
+    if (account.status === 'in') {
+      try {
+        const g = await startAiGameOnServer(difficulty, first);
+        send({ type: 'START', difficulty, first: g.first, seed: g.seed, gameId: g.gameId });
+        return;
+      } catch {
+        setNotice('서버에 연결하지 못해 포인트 없이 연습 판으로 시작합니다.');
+        setTimeout(() => setNotice(''), 4000);
+      } finally {
+        startingRef.current = false;
+      }
+    }
+    startingRef.current = false;
+    send({ type: 'START', difficulty, first });
+  };
+
+  // 판이 끝나면 조작 기록을 서버로 보내 정산한다
+  const settledRef = useRef(null);
+  useEffect(() => {
+    if (state?.phase !== 'over' || !state.gameId || settledRef.current === state.gameId) return;
+    settledRef.current = state.gameId;
+    setSettle({ status: 'pending' });
+    settleAiGameOnServer(state.gameId, state.log)
+      .then((r) => setSettle({ status: 'done', ...r }))
+      .catch(() => setSettle({ status: 'error' }));
+  }, [state]);
   // 첫 입력에서 소리를 켜고, 버튼을 누를 때마다 딸깍 소리를 낸다
   useEffect(() => {
     const onPointerDown = () => audio.unlock();
@@ -393,14 +456,15 @@ export default function App() {
   }, []);
   useGameSounds(state);
   return (
-    <>
-      <Game state={state} send={send} />
+    <AccountContext.Provider value={account}>
+      <Game state={state} send={send} onStart={startGame} settle={settle} />
+      {notice && <div className="net-toast" role="status">{notice}</div>}
       {(!state || state.phase === 'over') && <SoundControls />}
-    </>
+    </AccountContext.Provider>
   );
 }
 
-function Game({ state, send }) {
+function Game({ state, send, onStart, settle }) {
   // 엿보기(사람이 쓴 경우): 연출이 보인 뒤 3초 동안 모든 카드를 앞면으로 보여 준다. AI가 쓰면 사람 화면은 그대로다.
   const peekN = state?.itemEvent?.item === 'peek' && state.itemEvent.who === 'player' ? state.itemEvent.n : 0;
   const [peekPhase, setPeekPhase] = useState(null); // null | 'wait'(연출 중) | 'show'(모든 카드 공개)
@@ -483,7 +547,7 @@ function Game({ state, send }) {
   }, [state, send, toastN, turnToastN]);
 
   if (!state) {
-    return <Menu onStart={(difficulty) => send({ type: 'START', difficulty })} />;
+    return <Menu onStart={onStart} />;
   }
 
   const playerScore = scoreOf(state, 'player');
@@ -535,8 +599,10 @@ function Game({ state, send }) {
           </section>
         )}
 
+        {state.gameId && settle && <SettleLine settle={settle} winner={r.winner} />}
+
         <div className="row">
-          <button className="btn btn-primary" onClick={() => send({ type: 'START', difficulty: state.difficulty })}>
+          <button className="btn btn-primary" onClick={() => onStart(state.difficulty)}>
             <RotateCcw size={18} /> <span>다시 하기</span>
           </button>
           <button className="btn btn-normal" onClick={() => send({ type: 'MENU' })}>

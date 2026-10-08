@@ -78,7 +78,7 @@ export function detectBak(winnerCards, loserCards) {
 
 export function finalPayout(winnerCards, loserCards, goCount, bonus = 0) {
   const items = scoreItems(winnerCards);
-  if (bonus) items.push({ label: '판쓸 보너스', points: bonus });
+  if (bonus) items.push({ key: 'bonus', label: '판쓸 보너스', points: bonus });
   const base = calculateScore(winnerCards) + bonus;
   const withGo = applyGo(base, goCount);
   const { pibak, gwangbak } = detectBak(winnerCards, loserCards);

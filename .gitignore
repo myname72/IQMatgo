@@ -2,3 +2,5 @@ node_modules
 dist
 .firebase/
 tools/self-drawn/
+functions/game/
+functions/node_modules/

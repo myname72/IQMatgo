@@ -7,7 +7,9 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "test": "vitest run"
+    "test": "vitest run",
+    "pretest": "node scripts/copy-game.mjs",
+    "prebuild": "node scripts/copy-game.mjs"
   },
   "dependencies": {
     "firebase": "^13.0.0",

@@ -35,5 +35,11 @@
   },
   "firestore": {
     "rules": "firestore.rules"
+  },
+  "functions": {
+    "source": "functions",
+    "predeploy": [
+      "node scripts/copy-game.mjs"
+    ]
   }
 }

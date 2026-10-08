@@ -9,13 +9,14 @@ async function load() {
   if (!firebaseEnabled) return null;
   if (!cached) {
     cached = (async () => {
-      const [{ initializeApp }, auth, fs] = await Promise.all([
+      const [{ initializeApp }, auth, fs, fn] = await Promise.all([
         import('firebase/app'),
         import('firebase/auth'),
         import('firebase/firestore'),
+        import('firebase/functions'),
       ]);
       const app = initializeApp(firebaseConfig);
-      return { auth: auth.getAuth(app), fs: fs.getFirestore(app), A: auth, F: fs };
+      return { auth: auth.getAuth(app), fs: fs.getFirestore(app), fns: fn.getFunctions(app, 'asia-northeast3'), A: auth, F: fs, N: fn };
     })();
   }
   return cached;
@@ -113,3 +114,12 @@ export function watchWallet(user, cb, onError = () => {}) {
     off();
   };
 }
+
+// 서버 함수 호출 (로그인 필요). 판 시작 시 서버가 시드를 정해 주고, 끝나면 조작 기록으로 정산한다.
+async function call(name, data) {
+  const fb = await load();
+  const res = await fb.N.httpsCallable(fb.fns, name)(data);
+  return res.data;
+}
+export const startAiGameOnServer = (difficulty, first) => call('startAiGame', { difficulty, first });
+export const settleAiGameOnServer = (gameId, actions) => call('settleAiGame', { gameId, actions });
