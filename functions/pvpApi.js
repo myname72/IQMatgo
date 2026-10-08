@@ -4,7 +4,7 @@ import { onCall, HttpsError } from 'firebase-functions/v2/https';
 import { publicView, peekCardsOf } from './game/pvp.js';
 import { PVP_MIN_ENTRY } from './lib/settle.js';
 import {
-  newGame, applyAction, applyTimeout, applyForfeit, settleMoney, deadlineFor, secureRng, seatOf, WAIT_ROOM_MS,
+  newGame, applyAction, applyTimeout, applyForfeit, settleMoney, deadlineFor, secureRng, seatOf, HOST_ALIVE_MS,
 } from './lib/pvp.js';
 
 // 모듈이 불러와지는 순서상 index.js 의 initializeApp() 보다 먼저 실행될 수 있어서, 여기서도 한 번만 초기화한다
@@ -161,22 +161,59 @@ export const createRoom = onCall(opts, async (req) => {
   });
 });
 
-// ---- 코드로 입장 ----
+// 방장이 살아 있는 대기 방인지 (방장 화면이 주기적으로 heartbeat 를 보낸다)
+const isAlive = (room, now) => room.status === 'waiting' && now - room.updatedAt < HOST_ALIVE_MS;
+
+// ---- 열린 방 목록: 방장이 AI와 연습하며 기다리는 방들 ----
+export const listRooms = onCall(opts, async (req) => {
+  const uid = need(req);
+  const now = Date.now();
+  const snap = await db.collection('rooms').where('status', '==', 'waiting').limit(30).get();
+  const rooms = snap.docs
+    .filter((d) => d.data().hostUid !== uid && isAlive(d.data(), now))
+    .map((d) => ({ id: d.id, host: d.data().names.A, createdAt: d.data().createdAt }))
+    .sort((a, b) => b.createdAt - a.createdAt)
+    .slice(0, 20);
+  return { rooms };
+});
+
+// ---- 방장 신호: 방이 살아 있음을 알린다 ----
+export const heartbeat = onCall(opts, async (req) => {
+  const uid = need(req);
+  const roomId = req.data?.roomId;
+  if (typeof roomId !== 'string') fail('invalid-argument', '방 정보가 없습니다.');
+  return db.runTransaction(async (tx) => {
+    const rs = await tx.get(roomRef(roomId));
+    if (!rs.exists || rs.data().hostUid !== uid || rs.data().status !== 'waiting') return { ok: false };
+    tx.update(roomRef(roomId), { updatedAt: Date.now() });
+    return { ok: true };
+  });
+});
+
+// ---- 입장: 목록에서 고른 방(roomId) 또는 방 코드(code). 방장이 AI와 연습 중이어도 바로 대전이 시작된다 ----
 export const joinRoom = onCall(opts, async (req) => {
   const uid = need(req);
+  const roomIdArg = typeof req.data?.roomId === 'string' ? req.data.roomId : '';
   const code = String(req.data?.code ?? '').trim();
-  if (!/^\d{4}$/.test(code)) fail('invalid-argument', '방 코드는 숫자 4자리입니다.');
+  if (!roomIdArg && !/^\d{4}$/.test(code)) fail('invalid-argument', '방 코드는 숫자 4자리입니다.');
   return db.runTransaction(async (tx) => {
     const me = await loadUser(tx, uid);
     const active = await activeRoomOf(tx, me);
     if (active) return { roomId: active, resumed: true };
     checkEntry(me);
-    const q = await tx.get(db.collection('rooms').where('code', '==', code).where('status', '==', 'waiting').limit(1));
-    if (q.empty) fail('not-found', '해당 코드의 대기 중인 방이 없습니다.');
-    const doc = q.docs[0];
+    let doc;
+    if (roomIdArg) {
+      doc = await tx.get(roomRef(roomIdArg));
+      if (!doc.exists) fail('not-found', '방이 이미 닫혔습니다.');
+    } else {
+      const q = await tx.get(db.collection('rooms').where('code', '==', code).where('status', '==', 'waiting').limit(1));
+      if (q.empty) fail('not-found', '해당 코드의 대기 중인 방이 없습니다.');
+      doc = q.docs[0];
+    }
     const room = doc.data();
+    if (room.status !== 'waiting') fail('failed-precondition', '이미 대전이 시작된 방입니다.');
     if (room.hostUid === uid) fail('failed-precondition', '내가 만든 방입니다.');
-    if (Date.now() - room.createdAt > WAIT_ROOM_MS) fail('not-found', '만료된 방입니다.');
+    if (!isAlive(room, Date.now())) fail('not-found', '방장이 자리를 비웠습니다.');
     const host = await loadUser(tx, room.hostUid);
     checkEntry(host);
     startMatch(tx, doc.id, room, room.hostUid, uid, room.names.A, nameOf(me.data()), Date.now());
@@ -184,7 +221,7 @@ export const joinRoom = onCall(opts, async (req) => {
   });
 });
 
-// ---- 빠른 대전: 기다리는 방이 있으면 들어가고, 없으면 방을 만들어 기다린다 ----
+// ---- 빠른 대전: 기다리는 방이 있으면 바로 들어가고, 없으면 내가 방을 만들어 AI와 연습하며 기다린다 ----
 export const quickMatch = onCall(opts, async (req) => {
   const uid = need(req);
   return db.runTransaction(async (tx) => {
@@ -193,8 +230,8 @@ export const quickMatch = onCall(opts, async (req) => {
     if (active) return { roomId: active, resumed: true };
     checkEntry(me);
     const now = Date.now();
-    const q = await tx.get(db.collection('rooms').where('quick', '==', true).where('status', '==', 'waiting').limit(10));
-    const doc = q.docs.find((d) => d.data().hostUid !== uid && now - d.data().createdAt < WAIT_ROOM_MS);
+    const q = await tx.get(db.collection('rooms').where('status', '==', 'waiting').limit(20));
+    const doc = q.docs.find((d) => d.data().hostUid !== uid && isAlive(d.data(), now));
     if (doc) {
       const room = doc.data();
       const host = await loadUser(tx, room.hostUid);

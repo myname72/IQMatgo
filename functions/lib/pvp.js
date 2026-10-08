@@ -5,7 +5,8 @@ export const MOVE_MS = 30_000; // 한 번 움직이는 데 주어지는 시간
 export const FIRST_MOVE_MS = 40_000; // 판 시작 직후 첫 수는 조금 더
 export const MAX_TIMEOUTS = 3; // 연속 시간 초과가 이만큼 쌓이면 기권패
 export const RESOLVE_MIN_MS = 900; // 두 장을 뒤집은 뒤 판정까지 최소로 보여 주는 시간
-export const WAIT_ROOM_MS = 10 * 60_000; // 상대를 기다리는 방이 유지되는 시간
+export const HOST_ALIVE_MS = 45_000; // 방장이 이 시간 안에 신호(heartbeat)를 보낸 대기 방만 목록에 보인다
+export const HEARTBEAT_MS = 15_000;
 
 const ACTIONS = new Set(['FLIP', 'RESOLVE', 'GO', 'STOP']);
 export const sideOf = (seat) => (seat === 'A' ? 'player' : 'ai');

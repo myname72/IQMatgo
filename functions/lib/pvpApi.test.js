@@ -142,4 +142,40 @@ describe('사람 대전 API (인메모리 Firestore)', () => {
     expect(room(id).status).toBe('playing');
     expect(gameOf(id).phase).toBe('playing');
   });
+
+  it('열린 방 목록: 다른 사람이 만든 살아 있는 방만 보인다', async () => {
+    const a = await api.createRoom(req('alice'));
+    expect((await api.listRooms(req('alice'))).rooms).toEqual([]); // 내 방은 목록에 없다
+    const list = (await api.listRooms(req('bob'))).rooms;
+    expect(list).toHaveLength(1);
+    expect(list[0]).toMatchObject({ id: a.roomId, host: 'alice' });
+    expect(JSON.stringify(list)).not.toContain(room(a.roomId).code); // 코드는 노출하지 않는다
+  });
+
+  it('방장이 신호를 끊으면(45초 이상) 목록에서 사라지고, heartbeat 로 되살아난다', async () => {
+    const a = await api.createRoom(req('alice'));
+    store.set(`rooms/${a.roomId}`, { ...room(a.roomId), updatedAt: Date.now() - 60_000 });
+    expect((await api.listRooms(req('bob'))).rooms).toEqual([]);
+    await expect(api.joinRoom(req('bob', { roomId: a.roomId }))).rejects.toMatchObject({ code: 'not-found' });
+    expect(await api.heartbeat(req('alice', { roomId: a.roomId }))).toEqual({ ok: true });
+    expect((await api.listRooms(req('bob'))).rooms).toHaveLength(1);
+    expect(await api.heartbeat(req('bob', { roomId: a.roomId }))).toEqual({ ok: false }); // 방장만 보낼 수 있다
+  });
+
+  it('목록에서 고른 방에 들어가면 방장이 기다리던 중이어도 바로 대전이 시작된다', async () => {
+    const a = await api.createRoom(req('alice'));
+    const j = await api.joinRoom(req('bob', { roomId: a.roomId }));
+    expect(j.roomId).toBe(a.roomId);
+    expect(room(a.roomId).status).toBe('playing');
+    expect(room(a.roomId).seats).toEqual(['alice', 'bob']);
+    // 이미 시작된 방에는 다른 사람이 들어올 수 없다
+    wallet('carol');
+    await expect(api.joinRoom(req('carol', { roomId: a.roomId }))).rejects.toMatchObject({ code: 'failed-precondition' });
+  });
+
+  it('빠른 대전은 코드로 만든 방에도 들어간다', async () => {
+    const a = await api.createRoom(req('alice'));
+    const b = await api.quickMatch(req('bob'));
+    expect(b).toMatchObject({ roomId: a.roomId, matched: true });
+  });
 });

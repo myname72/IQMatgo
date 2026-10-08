@@ -2,12 +2,12 @@ import { useEffect, useLayoutEffect, useReducer, useRef, useState, useSyncExtern
 import { RotateCcw, Trophy, Hand, Music, Volume2, VolumeX } from 'lucide-react';
 import * as audio from './audio/audio.js';
 import CardFace from './components/CardFace.jsx';
-import { createContext, useContext } from 'react';
+import { createContext, useCallback, useContext } from 'react';
 import { useAccount } from './firebase/useAccount.js';
 import { settleAiGameOnServer, startAiGameOnServer } from './firebase/wallet.js';
 import { seededRng } from './game/rng.js';
 import PvpRoom from './pvp/PvpRoom.jsx';
-import { createRoom, joinRoom, messageOf, quickMatch } from './firebase/pvp.js';
+import { createRoom, joinByCode, joinById, listRooms, messageOf, quickMatch } from './firebase/pvp.js';
 
 const AccountContext = createContext(null);
 const OpponentContext = createContext('AI'); // 상대 이름 (사람 대전이면 닉네임)
@@ -286,6 +286,25 @@ function PvpLobby({ onEnter, resumeRoom }) {
   const [code, setCode] = useState('');
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
+  const [rooms, setRooms] = useState([]); // 열린 방 목록 (방장이 AI와 연습하며 기다리는 방)
+  // 열린 방 목록을 주기적으로 새로 읽는다 (화면이 보일 때만)
+  const loggedIn = acc.status === 'in';
+  useEffect(() => {
+    if (!loggedIn) return undefined;
+    let dead = false;
+    const load = () => {
+      if (document.hidden) return;
+      listRooms().then((r) => !dead && setRooms(r.rooms)).catch(() => {});
+    };
+    load();
+    const t = setInterval(load, 6000);
+    document.addEventListener('visibilitychange', load);
+    return () => {
+      dead = true;
+      clearInterval(t);
+      document.removeEventListener('visibilitychange', load);
+    };
+  }, [loggedIn]);
   const run = async (fn) => {
     setBusy(true);
     setErr('');
@@ -302,6 +321,7 @@ function PvpLobby({ onEnter, resumeRoom }) {
     <section className="pvp-lobby" aria-label="사람 대전">
       <h3>⚔️ 사람 대전</h3>
       <p className="account-note">AI 대전과 같은 규칙 · 점당 100포인트 · 3,000 포인트 이상 필요 · 한 수에 30초</p>
+      <p className="account-note">방을 만들면 AI와 연습하며 기다리다가, 누군가 들어오면 바로 대전이 시작됩니다.</p>
       {resumeRoom && (
         <button className="btn btn-hard" onClick={() => onEnter(resumeRoom)} disabled={busy}>진행 중인 대전으로 돌아가기</button>
       )}
@@ -309,7 +329,17 @@ function PvpLobby({ onEnter, resumeRoom }) {
         <button className="btn btn-normal account-btn" onClick={() => run(quickMatch)} disabled={busy}>빠른 대전</button>
         <button className="btn btn-easy account-btn" onClick={() => run(() => createRoom('easy'))} disabled={busy}>방 만들기</button>
       </div>
-      <form className="account-actions" onSubmit={(e) => { e.preventDefault(); run(() => joinRoom(code.trim())); }}>
+      <div className="room-list" aria-label="열린 방">
+        <strong>열린 방 {rooms.length > 0 ? `(${rooms.length})` : ''}</strong>
+        {rooms.length === 0 && <span className="account-note">지금 열린 방이 없습니다. 방을 만들어 기다려 보세요.</span>}
+        {rooms.map((r) => (
+          <div className="room-row" key={r.id}>
+            <span>{r.host}님의 방</span>
+            <button className="btn btn-hard account-btn" onClick={() => run(() => joinById(r.id))} disabled={busy}>입장</button>
+          </div>
+        ))}
+      </div>
+      <form className="account-actions" onSubmit={(e) => { e.preventDefault(); run(() => joinByCode(code.trim())); }}>
         <input className="code-input" inputMode="numeric" pattern="[0-9]*" maxLength={4} placeholder="방 코드 4자리" value={code} onChange={(e) => setCode(e.target.value.replace(/\D/g, ''))} />
         <button className="btn btn-primary account-btn" disabled={busy || code.length !== 4}>코드로 입장</button>
       </form>
@@ -450,6 +480,28 @@ const LOGGED = new Set(['FLIP', 'RESOLVE', 'GO', 'STOP']);
 // 이긴 편이 다음 판의 선이 된다 (비기면 이전 선 유지)
 const nextFirst = (state) => (state?.phase === 'over' ? (state.result?.winner ?? state.first ?? 'player') : 'player');
 
+// 방을 만들고 기다리는 동안 AI와 하는 연습 판. 누군가 방에 들어오면 이 화면은 바로 대전 화면으로 바뀐다.
+function PracticeWhileWaiting({ room, onCancel }) {
+  const [state, send] = useReducer(appReducer, null, () => appReducer(null, { type: 'START', difficulty: 'easy', first: 'player' }));
+  useGameSounds(state);
+  const wrapped = useCallback(
+    (a) => {
+      if (a.type === 'MENU') onCancel(); // 메뉴로 = 방 닫기
+      else send(a);
+    },
+    [onCancel],
+  );
+  return (
+    <>
+      <GameView state={state} send={wrapped} onStart={(d) => send({ type: 'START', difficulty: d, first: nextFirst(state) })} settle={null} />
+      <div className="wait-pill" role="status">
+        <span>⏳ 상대를 기다리는 중 · 방 코드 <b>{room.code}</b></span>
+        <button className="account-link" onClick={onCancel}>방 닫기</button>
+      </div>
+    </>
+  );
+}
+
 // 상대 이름을 알려 주는 래퍼 (사람 대전이면 닉네임, 아니면 AI)
 function GameView(props) {
   return (
@@ -523,14 +575,9 @@ export default function App() {
           roomId={pvpRoom}
           uid={account.user?.uid}
           Game={GameView}
+          Practice={PracticeWhileWaiting}
           useGameSounds={useGameSounds}
           onExit={() => setPvpRoom(null)}
-          onFallbackToAi={() => {
-            setPvpRoom(null);
-            setNotice('상대가 없어 AI와 연습 판으로 시작합니다.');
-            setTimeout(() => setNotice(''), 3000);
-            startGame('easy');
-          }}
         />
       ) : (
         <GameView state={state} send={send} onStart={startGame} settle={settle} remoteEnter={setPvpRoom} />

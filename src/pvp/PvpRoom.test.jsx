@@ -17,6 +17,7 @@ vi.mock('../firebase/pvp.js', async () => {
     claimTimeout: async () => { calls.claimTimeout++; },
     leaveRoom: async () => { calls.leaveRoom++; },
     playAction: async (id, a) => { calls.playAction.push(a); },
+    heartbeat: async () => {},
     rematch: async () => {},
     messageOf: (e) => String(e?.message ?? ''),
     viewOf: (room, uid) => {
@@ -41,7 +42,8 @@ const mkRoom = (extra = {}) => {
 
 let lastProps = null;
 const Game = (props) => { lastProps = props; return <div data-testid="game">{props.state.turn}|{props.remote.names.other}</div>; };
-const setup = (uid) => render(<PvpRoom roomId="r1" uid={uid} Game={Game} onExit={() => {}} onFallbackToAi={() => {}} useGameSounds={() => {}} />);
+const Practice = ({ room }) => <div data-testid="practice">연습 {room.code}</div>;
+const setup = (uid) => render(<PvpRoom roomId="r1" uid={uid} Game={Game} Practice={Practice} onExit={() => {}} useGameSounds={() => {}} />);
 
 beforeEach(() => { cleanup(); lastProps = null; calls.claimTimeout = 0; calls.leaveRoom = 0; calls.playAction = []; roomCb = null; });
 
@@ -60,10 +62,14 @@ describe('사람 대전 화면 연결', () => {
     expect(screen.getByTestId('game').textContent).toBe('ai|밥');
   });
 
-  it('대기 중인 방은 코드를 보여 준다', async () => {
+  it('대기 중인 방은 연습 판을 보여 주고, 상대가 들어오면 바로 대전 화면으로 바뀐다', async () => {
     setup('alice');
-    await act(async () => roomCb({ status: 'waiting', quick: false, code: '4821', seats: ['alice', ''], names: { A: '앨리스', B: '' } }));
-    expect(screen.getByText('4821')).toBeTruthy();
+    await act(async () => roomCb({ status: 'waiting', quick: false, code: '4821', seats: ['alice', ''], names: { A: '앨리스', B: '' }, updatedAt: Date.now() }));
+    expect(screen.getByTestId('practice').textContent).toContain('4821');
+    expect(screen.queryByTestId('game')).toBeNull();
+    await act(async () => roomCb(mkRoom())); // 누군가 입장해 판이 시작됨
+    expect(screen.queryByTestId('practice')).toBeNull();
+    expect(screen.getByTestId('game')).toBeTruthy();
   });
 
   it('방이 사라지면 안내를 보여 준다', async () => {

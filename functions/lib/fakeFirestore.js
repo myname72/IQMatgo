@@ -26,6 +26,7 @@ export function makeDb() {
     constructor(path, filters = [], lim = Infinity) { this.path = path; this.filters = filters; this.lim = lim; }
     where(f, op, v) { return new Query(this.path, [...this.filters, [f, op, v]], this.lim); }
     limit(n) { return new Query(this.path, this.filters, n); }
+    async get() { return this.run(); }
     run() {
       const docs = [];
       for (const [p, d] of store) {

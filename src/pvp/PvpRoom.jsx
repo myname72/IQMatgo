@@ -1,29 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { claimTimeout, leaveRoom, messageOf, playAction, rematch, viewOf, watchPeek, watchRoom } from '../firebase/pvp.js';
-
-// 상대를 기다리는 화면
-function Waiting({ room, onCancel, quickWaitSec }) {
-  return (
-    <div className="screen menu-screen">
-      <h2 className="title">{room.quick ? '상대를 찾는 중…' : '친구를 기다리는 중…'}</h2>
-      {!room.quick && (
-        <>
-          <p className="subtitle">친구에게 이 코드를 알려 주세요</p>
-          <div className="room-code" aria-label="방 코드">{room.code}</div>
-        </>
-      )}
-      {room.quick && quickWaitSec > 0 && <p className="subtitle">{quickWaitSec}초 안에 상대가 없으면 AI와 연습 판으로 시작합니다</p>}
-      <button className="btn btn-normal" onClick={onCancel}>취소</button>
-    </div>
-  );
-}
+import { claimTimeout, heartbeat, leaveRoom, messageOf, playAction, rematch, viewOf, watchPeek, watchRoom } from '../firebase/pvp.js';
 
 // 사람 대전 방. Game 은 기존 대전 화면 컴포넌트를 그대로 받아 쓴다.
-export default function PvpRoom({ roomId, uid, Game, onExit, onFallbackToAi, useGameSounds }) {
+export default function PvpRoom({ roomId, uid, Game, Practice, onExit, useGameSounds }) {
   const [room, setRoom] = useState(undefined); // undefined: 불러오는 중, null: 방이 없음
   const [peek, setPeek] = useState(null);
   const [notice, setNotice] = useState('');
-  const [quickWaitSec, setQuickWaitSec] = useState(0);
 
   useEffect(() => watchRoom(roomId, setRoom), [roomId]);
   useEffect(() => watchPeek(roomId, uid, setPeek), [roomId, uid]);
@@ -44,22 +26,22 @@ export default function PvpRoom({ roomId, uid, Game, onExit, onFallbackToAi, use
 
   useGameSounds(view);
 
-  // 빠른 대전: 일정 시간 안에 상대가 안 오면 방을 닫고 AI 연습 판으로 시작한다
-  const quickWaiting = room?.status === 'waiting' && room.quick;
+  // 방에서 기다리는 동안에는 AI와 연습하며, 주기적으로 "방이 살아 있다"고 서버에 알린다.
+  // 누군가 들어와 방이 시작되면(status 가 playing) 연습 판은 바로 사라지고 대전 화면으로 바뀐다.
+  const waiting = room?.status === 'waiting';
   useEffect(() => {
-    if (!quickWaiting) return undefined;
-    let left = 10;
-    setQuickWaitSec(left);
-    const t = setInterval(() => {
-      left -= 1;
-      setQuickWaitSec(left);
-      if (left <= 0) {
-        clearInterval(t);
-        leaveRoom(roomId).catch(() => {}).finally(() => onFallbackToAi());
-      }
-    }, 1000);
+    if (!waiting) return undefined;
+    heartbeat(roomId).catch(() => {});
+    const t = setInterval(() => heartbeat(roomId).catch(() => {}), 15000);
     return () => clearInterval(t);
-  }, [quickWaiting, roomId]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [waiting, roomId]);
+
+  // 상대가 들어와 대전이 시작되면 알려 준다
+  const prevStatus = useRef(null);
+  useEffect(() => {
+    if (prevStatus.current === 'waiting' && room?.status === 'playing') setNotice('상대가 입장했습니다! 대전을 시작합니다.');
+    prevStatus.current = room?.status ?? null;
+  }, [room?.status]);
 
   // 시간 초과: 기한이 지나면 두 쪽 모두 서버에 처리를 요청한다 (먼저 온 요청만 적용된다)
   useEffect(() => {
@@ -100,7 +82,7 @@ export default function PvpRoom({ roomId, uid, Game, onExit, onFallbackToAi, use
     );
   }
   if (room.status === 'waiting') {
-    return <Waiting room={room} quickWaitSec={quickWaitSec} onCancel={() => leaveRoom(roomId).catch(() => {}).finally(onExit)} />;
+    return <Practice room={room} onCancel={() => leaveRoom(roomId).catch(() => {}).finally(onExit)} />;
   }
   if (!view) return null;
 

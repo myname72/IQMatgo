@@ -73,4 +73,4 @@ export const settleAiGame = onCall(opts, async (req) => {
   });
 });
 
-export { createRoom, joinRoom, quickMatch, leaveRoom, playAction, claimTimeout, rematch } from './pvpApi.js';
+export { createRoom, joinRoom, quickMatch, listRooms, heartbeat, leaveRoom, playAction, claimTimeout, rematch } from './pvpApi.js';
