@@ -45,7 +45,7 @@ jobs:
           printf '%s' "$SA_JSON" > "$RUNNER_TEMP/sa.json"
           export GOOGLE_APPLICATION_CREDENTIALS="$RUNNER_TEMP/sa.json"
           (cd functions && npm ci)
-          npx --yes firebase-tools@latest deploy --only functions --project "${{ vars.FIREBASE_PROJECT_ID }}" --non-interactive
+          npx --yes firebase-tools@latest deploy --only functions --force --project "${{ vars.FIREBASE_PROJECT_ID }}" --non-interactive
       # 규칙은 콘솔에서 직접 올려도 되므로, 권한(Firebase 규칙 관리자)이 없어 실패해도 전체를 막지 않는다.
       - name: Deploy Firestore rules
         if: github.event_name == 'push'
