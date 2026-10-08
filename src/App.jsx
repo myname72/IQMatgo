@@ -2,6 +2,7 @@ import { useEffect, useLayoutEffect, useReducer, useRef, useState, useSyncExtern
 import { RotateCcw, Trophy, Hand, Music, Volume2, VolumeX } from 'lucide-react';
 import * as audio from './audio/audio.js';
 import CardFace from './components/CardFace.jsx';
+import { useAccount } from './firebase/useAccount.js';
 import { ITEM_CARDS, ITEM_INFO } from './game/cards.js';
 import { WIN_THRESHOLD, scoreItems } from './game/scoring.js';
 import {
@@ -169,9 +170,34 @@ function SweepToast({ event }) {
   );
 }
 
+function AccountBar() {
+  const acc = useAccount();
+  if (acc.status === 'off') return null;
+  return (
+    <div className="account-bar">
+      {acc.status === 'loading' && <span className="account-note">계정 확인 중…</span>}
+      {acc.status === 'out' && (
+        <>
+          <button className="btn btn-normal account-btn" onClick={acc.signIn}>Google로 로그인</button>
+          <span className="account-note">로그인하면 포인트가 저장됩니다. 로그인 없이도 연습은 가능해요.</span>
+        </>
+      )}
+      {acc.status === 'in' && (
+        <>
+          <span className="account-name">{acc.user.name || '플레이어'}</span>
+          <span className="account-points">🪙 {acc.points === null ? '…' : acc.points.toLocaleString()}</span>
+          <button className="account-link" onClick={acc.signOut}>로그아웃</button>
+        </>
+      )}
+      {acc.error && <span className="account-error">{acc.error}</span>}
+    </div>
+  );
+}
+
 function Menu({ onStart }) {
   return (
     <div className="screen menu-screen">
+      <AccountBar />
       <h1 className="title">IQ 맞고</h1>
       <p className="subtitle">카드를 뒤집어 같은 월을 찾고, 맞고 규칙으로 점수를 겨루세요!</p>
       <div className="row">

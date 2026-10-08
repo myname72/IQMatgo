@@ -349,3 +349,12 @@ body:has(.burst-bomb) #root { animation: bomb-shake 0.6s ease-out; }
   .game-header .btn span { display: none; }
   .game-header .btn { padding: 0.45rem 0.6rem; }
 }
+
+/* 계정 / 포인트 */
+.account-bar { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 8px 12px; padding: 8px 12px; border-radius: 14px; background: rgba(255,255,255,0.07); max-width: 100%; }
+.account-btn { padding: 0.45rem 1rem; font-size: 0.95rem; }
+.account-note { font-size: 0.78rem; opacity: 0.75; }
+.account-name { font-weight: 700; }
+.account-points { font-weight: 900; color: #ffe27a; font-variant-numeric: tabular-nums; }
+.account-link { background: none; border: 0; color: #9fb4ff; text-decoration: underline; cursor: pointer; font: inherit; font-size: 0.85rem; }
+.account-error { width: 100%; text-align: center; color: #ff9a9a; font-size: 0.8rem; }
