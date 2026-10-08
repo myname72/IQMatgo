@@ -291,7 +291,8 @@ export function resolveFlip(state) {
   const rewards = [];
   if (state.revealed.length > 0 && next.revealed.length === 0) rewards.push({ kind: 'sweep', label: '판쓸', pi: 1, bonus: 1 });
   if (!state.revealed.includes(i) && !state.revealed.includes(j)) rewards.push({ kind: 'jjok', label: '쪽', pi: 1 });
-  if (state.revealed.filter((k) => state.deck[k].card.month === a.month).length >= 3) rewards.push({ kind: 'bomb', label: '폭탄', pi: 2 });
+  // 폭탄: 같은 월 4장을 모두 내가 먹었을 때 (이번 짝으로 네 장이 모두 내 패가 됨)
+  if (next.captured[who].filter((c) => c.month === a.month).length >= 4) rewards.push({ kind: 'bomb', label: '폭탄', pi: 2 });
   if (rewards.length) {
     const r = applyRewards(next, who, rewards);
     Object.assign(next, r.state, {
