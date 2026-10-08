@@ -226,44 +226,67 @@ describe('게임 진행', () => {
     expect(g.revealed).not.toContain(firsts[1]);
     expect(g.lastHidden.sort()).toEqual([firsts[0], firsts[1]].sort());
   });
-  it('쉬움: 열린 카드를 다시 골라 또 틀리면 5턴이 새로 시작된다', () => {
+  it('쉬움: 앞면 카드는 틀림에 휘말리지 않고, 새로 틀린 두 장만 5턴으로 열린다', () => {
     let g = cleanGame('easy');
     const f = [1, 2, 3, 4].map((m) => g.deck.findIndex((s) => s.card.month === m));
     g = resolveFlip(flipCard(flipCard(g, f[0]), f[1]));
     g = resolveFlip(flipCard(flipCard(g, f[2]), f[3]));
     expect(g.revealLeft[f[0]]).toBe(4);
-    const fresh = g.deck.findIndex((x, i) => !x.taken && !g.revealed.includes(i) && x.card.kind !== 'item' && x.card.month !== 1);
-    g = resolveFlip(flipCard(flipCard(g, f[0]), fresh)); // 앞면 f[0] + 아직 안 본 카드로 틀림
-    expect(g.revealLeft[f[0]]).toBe(5);
-    expect(g.revealLeft[fresh]).toBe(5);
-    expect(g.revealLeft[f[1]]).toBe(3);
+    // 앞면 카드는 짝일 때만 고를 수 있으므로, 틀리는 수는 뒷면 두 장뿐이다
+    const back = g.deck
+      .map((x, i) => (!x.taken && !g.revealed.includes(i) && x.card.kind !== 'item' ? i : -1))
+      .filter((i) => i >= 0);
+    const a = back[0];
+    const b = back.find((i) => g.deck[i].card.month !== g.deck[a].card.month);
+    g = resolveFlip(flipCard(flipCard(g, a), b));
+    expect(g.revealLeft[a]).toBe(5);
+    expect(g.revealLeft[b]).toBe(5);
+    expect(g.revealLeft[f[0]]).toBe(3); // 먼저 열려 있던 카드는 한 턴 더 줄어든다
+    expect(g.revealLeft[f[2]]).toBe(4);
   });
 
-  it('앞면으로 보이는 카드 두 장은 짝이 맞을 때만 고를 수 있다 (꼼수 방지)', () => {
-    let g = cleanGame('easy');
-    const at = (m, n = 0) => g.deck.map((s, k) => (s.card.month === m ? k : -1)).filter((k) => k >= 0)[n];
-    // 1월 한 장과 2월 한 장을 앞면으로 만들어 둔다
-    const a = at(1);
-    const b = at(2);
-    g = { ...g, revealed: [a, b], revealLeft: { [a]: 3, [b]: 3 } };
+  it('앞면 카드는 짝을 맞출 때만 고를 수 있다 (새 카드를 안 보여 주는 꼼수 방지)', () => {
+    const base = cleanGame('easy');
+    const at = (m, n = 0) => base.deck.map((s, k) => (s.card.month === m ? k : -1)).filter((k) => k >= 0)[n];
+    const a1 = at(1);
+    const b1 = at(2);
+    const back = base.deck.findIndex((x, i) => !x.taken && i !== a1 && i !== b1 && x.card.kind !== 'item' && x.card.month !== 1 && x.card.month !== 2);
 
-    // 앞면 a 를 고른 뒤 짝이 아닌 앞면 b 는 고를 수 없다
-    const one = flipCard(g, a);
-    expect(one.flipped).toEqual([a]);
-    expect(canFlip(one, b)).toBe(false);
-    expect(flipCard(one, b)).toBe(one); // 상태가 그대로 = 선택되지 않음
+    // 1월 한 장, 2월 한 장만 앞면 — 앞면끼리 짝이 없으니 첫 장으로 고를 수 없다
+    const lone = { ...base, revealed: [a1, b1], revealLeft: { [a1]: 3, [b1]: 3 } };
+    expect(canFlip(lone, a1)).toBe(false);
+    expect(canFlip(lone, back)).toBe(true);
 
-    // 아직 안 본 카드는 짝이 아니어도 고를 수 있다
-    const fresh = g.deck.findIndex((x, i) => !x.taken && i !== a && i !== b && x.card.kind !== 'item' && x.card.month !== 1);
-    expect(canFlip(one, fresh)).toBe(true);
-    expect(flipCard(one, fresh).flipped).toEqual([a, fresh]);
+    // 뒷면을 먼저 고른 뒤에는, 짝이 아닌 앞면 카드를 고를 수 없다 (꼼수)
+    const one = flipCard(lone, back);
+    expect(one.flipped).toEqual([back]);
+    expect(canFlip(one, a1)).toBe(false);
+    expect(canFlip(one, b1)).toBe(false);
+    expect(flipCard(one, a1)).toBe(one); // 상태 그대로 = 선택되지 않음
+    // 다른 뒷면 카드는 고를 수 있다
+    const other = base.deck.findIndex((x, i) => !x.taken && i !== back && i !== a1 && i !== b1 && x.card.kind !== 'item');
+    expect(canFlip(one, other)).toBe(true);
 
-    // 앞면 카드끼리라도 짝이 맞으면 고를 수 있다
-    const a2 = at(1, 1);
-    let h = { ...g, revealed: [a, a2], revealLeft: { [a]: 3, [a2]: 3 } };
-    h = flipCard(h, a);
-    expect(canFlip(h, a2)).toBe(true);
-    expect(flipCard(h, a2).flipped).toEqual([a, a2]);
+    // 같은 월의 앞면 카드는 고를 수 있다 (짝 맞추기)
+    const m = base.deck[back].card.month;
+    const sameMonth = base.deck.findIndex((x, i) => i !== back && !x.taken && x.card.month === m);
+    const matchable = { ...base, revealed: [sameMonth], revealLeft: { [sameMonth]: 3 } };
+    const picked = flipCard(matchable, back);
+    expect(canFlip(picked, sameMonth)).toBe(true);
+    expect(resolveFlip(flipCard(picked, sameMonth)).captured.player).toHaveLength(2);
+  });
+
+  it('앞면 짝이 둘 다 보이면 첫 장으로 골라 바로 먹을 수 있다', () => {
+    const base = cleanGame('easy');
+    const pair = base.deck.map((s, k) => (s.card.month === 1 ? k : -1)).filter((k) => k >= 0).slice(0, 2);
+    const g = { ...base, revealed: pair, revealLeft: { [pair[0]]: 3, [pair[1]]: 3 } };
+    expect(canFlip(g, pair[0])).toBe(true);
+    const one = flipCard(g, pair[0]);
+    expect(canFlip(one, pair[1])).toBe(true);
+    // 앞면을 먼저 골랐으면 그 짝만 고를 수 있다 (뒷면 카드로 도망갈 수 없다)
+    const back = base.deck.findIndex((x, i) => !x.taken && !pair.includes(i) && x.card.kind !== 'item');
+    expect(canFlip(one, back)).toBe(false);
+    expect(resolveFlip(flipCard(one, pair[1])).captured.player).toHaveLength(2);
   });
 
   it('AI도 짝이 아닌 앞면 카드 두 장을 고르지 않는다', () => {

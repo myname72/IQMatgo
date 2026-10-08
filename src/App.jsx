@@ -383,7 +383,7 @@ function RulesModal({ onClose }) {
         <h3>게임 규칙</h3>
         <p>• 화투 48장 중 같은 월 2장을 뒤집어 맞추면 가져가고 한 번 더 뒤집을 수 있습니다. 틀리거나, 한 턴에 카드 4장(2번 시도)을 모두 열면 맞췄어도 상대 차례입니다.</p>
         <p>• 시작할 때 <b>카드 4장이 앞면으로 깔려</b> 있어, 먼저 하는 쪽이 불리하지 않도록 두 사람이 한 턴씩 보고 시작합니다. 이긴 편이 다음 판의 선이 됩니다. 깔다가 아이템 패가 나오면 선(먼저 하는 사람)이 그냥 먹고(엿보기만 효과가 바로 발동), 일반 카드 4장은 항상 깔립니다.</p>
-        <p>• <b>앞면으로 보이는 카드 두 장은 짝이 맞을 때만</b> 고를 수 있습니다. 못 맞출 것 같을 때 아는 카드만 골라 상대에게 새 카드를 안 보여 주는 꼼수를 막기 위해서입니다. (앞면 카드 + 아직 안 본 카드는 언제든 가능)</p>
+        <p>• <b>앞면으로 보이는 카드는 짝을 맞출 때만</b> 고를 수 있습니다. 뒷면 카드를 먼저 골랐다면 두 번째는 다른 뒷면 카드이거나 같은 월의 앞면 카드여야 하고, 앞면 카드를 먼저 골랐다면 그 짝만 고를 수 있습니다(앞면 짝이 둘 다 보일 때). 그래서 한 턴은 <b>짝을 먹거나, 새 카드 두 장을 보여 주거나</b> 둘 중 하나가 됩니다. 아는 카드만 골라 상대에게 정보를 덜 주는 꼼수를 막기 위한 규칙입니다.</p>
         <p>• 틀린 카드는 5턴(사람과 AI의 턴을 모두 셉니다) 동안 앞면으로 남아 있고, 앞면인 카드도 다시 골라 짝을 맞출 수 있습니다. 카드 모서리의 숫자는 남은 턴이고, 점선 테두리 카드는 이번 턴이 끝나면 뒷면으로 돌아갑니다.</p>
         <p>• 판에는 <b>아이템 패 6장</b>(쌍피 2, 쓰리피, 섞기, 초기화, 엿보기)이 섞여 있습니다. 뒤집으면 그 자리에서 효과가 발동하고 시도 횟수는 쓰지 않습니다. 쌍피·쓰리피는 피 2장·3장으로 계산되어 먹은 패에 들어가고, 섞기는 남은 카드의 위치를 모두 바꾸며, 초기화는 열려 있던 카드를 모두 뒷면으로 돌리고, 엿보기는 쓴 사람만 3초 동안 닫혀 있는 카드의 절반(무작위, 아이템 패는 제외)을 볼 수 있게 합니다(상대에게는 보이지 않고, 그동안 카드를 누를 수 없습니다).</p>
         <p>• 광 3점(비광 포함 2점)·4광 4점·5광 15점, 고도리 5점, 홍단·청단·초단 각 3점</p>
@@ -926,7 +926,7 @@ function Game({ state, send, onStart, settle, remote, remoteEnter }) {
                   style={{ transform: `translate(${dx}px, ${dy}px) rotate(${rot}deg) scale(var(--reveal-scale, 1.25))` }}
                   onClick={() => send({ type: 'FLIP', index })}
                   disabled={!canClick || selected || !canFlip(state, index)}
-                  title={canClick && !selected && !canFlip(state, index) ? '앞면 카드끼리는 짝이 맞을 때만 고를 수 있습니다' : `앞면 유지 ${state.revealLeft[index] ?? ''}턴 남음`}
+                  title={canClick && !selected && !canFlip(state, index) ? '앞면 카드는 짝을 맞출 때만 고를 수 있습니다' : `앞면 유지 ${state.revealLeft[index] ?? ''}턴 남음`}
                 >
                   <CardFace card={slot.card} />
                   {state.revealLeft[index] > 0 && <span className="left-badge">{state.revealLeft[index]}</span>}
@@ -942,10 +942,11 @@ function Game({ state, send, onStart, settle, remote, remoteEnter }) {
               ) : (
                 <button
                   type="button"
-                  className={`back-card ${state.lastHidden.includes(index) ? 'returned' : ''}`}
+                  className={`back-card ${state.lastHidden.includes(index) ? 'returned' : ''} ${canClick && !canFlip(state, index) ? 'blocked' : ''}`}
                   style={{ transform: `translate(${dx}px, ${dy}px) rotate(${rot}deg)` }}
                   onClick={() => send({ type: 'FLIP', index })}
-                  disabled={!canClick}
+                  disabled={!canClick || !canFlip(state, index)}
+                  title={canClick && !canFlip(state, index) ? '앞면 카드를 골랐으니 그 짝을 골라야 합니다' : undefined}
                   aria-label="뒤집지 않은 카드"
                 >
                   <span className="card-pattern" />

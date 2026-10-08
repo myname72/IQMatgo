@@ -10,13 +10,14 @@ describe('사람 대전: 서버 규칙', () => {
   it('내 차례가 아니면 카드를 뒤집을 수 없다', () => {
     const g = fresh('A');
     expect(() => applyAction(g, 'B', { type: 'FLIP', index: 0 }, 1000)).toThrow('not-your-turn');
-    const ok = applyAction(g, 'A', { type: 'FLIP', index: g.state.deck.findIndex((s) => !s.taken && !g.state.revealed.includes(0) && s.card.kind !== 'item') }, 1000);
+    const ok = applyAction(g, 'A', { type: 'FLIP', index: g.state.deck.findIndex((s, i) => !s.taken && !g.state.revealed.includes(i) && s.card.kind !== 'item') }, 1000);
     expect(ok.state.flipped).toHaveLength(1);
   });
 
   it('두 장을 뒤집어도 보여 주는 시간이 지나기 전에는 판정할 수 없다', () => {
     let g = fresh('A');
-    const open = [...g.state.deck.keys()].filter((i) => !g.state.deck[i].taken && g.state.deck[i].card.kind !== 'item');
+    // 아직 안 본(뒷면) 일반 카드 두 장 (앞면 카드는 짝일 때만 고를 수 있다)
+    const open = [...g.state.deck.keys()].filter((i) => !g.state.deck[i].taken && g.state.deck[i].card.kind !== 'item' && !g.state.revealed.includes(i));
     g = applyAction(g, 'A', { type: 'FLIP', index: open[0] }, 1000);
     g = applyAction(g, 'A', { type: 'FLIP', index: open[1] }, 1000);
     expect(() => applyAction(g, 'B', { type: 'RESOLVE' }, 1000 + RESOLVE_MIN_MS - 1)).toThrow('too-early');

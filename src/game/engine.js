@@ -199,18 +199,27 @@ function useItem(state, index) {
 }
 
 // 지금 이 카드를 고를 수 있는지.
-// 앞면으로 보이는(revealed) 카드도 고를 수 있지만, 앞면 카드 두 장은 짝이 맞을 때만 고를 수 있다.
-// 못 맞출 것 같을 때 이미 아는 카드 두 장을 골라 상대에게 새 카드를 안 보여 주는 꼼수를 막는다.
+// 앞면으로 보이는(revealed) 카드는 "짝을 맞출 때"만 고를 수 있다.
+// 아는 카드를 일부러 골라 상대에게 새 카드를 덜 보여 주는 꼼수를 막기 위한 규칙이라,
+// 한 턴은 반드시 짝을 먹거나 새 카드 두 장을 보여 주게 된다.
+//   · 앞면 카드를 먼저 고르려면 앞면인 짝이 있어야 하고, 두 번째는 그 짝만 고를 수 있다
+//   · 뒷면 카드를 먼저 골랐으면 두 번째는 다른 뒷면 카드이거나, 같은 월의 앞면 카드여야 한다
 export function canFlip(state, index) {
   const slot = state.deck[index];
   if (state.phase !== 'playing' || !slot || slot.taken) return false;
   if (state.flipped.length >= 2 || state.flipped.includes(index)) return false;
-  if (state.flipped.length === 1) {
-    const first = state.flipped[0];
-    if (state.revealed.includes(first) && state.revealed.includes(index)
-      && state.deck[first].card.month !== slot.card.month) return false;
+  if (isItem(slot.card)) return true; // 아이템 패는 언제든 뒤집을 수 있다
+
+  const faceUp = (i) => state.revealed.includes(i);
+  const first = state.flipped.length === 1 ? state.flipped[0] : null;
+
+  if (!faceUp(index)) {
+    // 뒷면 카드: 앞면 카드를 먼저 골랐다면 그 짝을 맞춰야 하므로 고를 수 없다
+    return first === null || !faceUp(first);
   }
-  return true;
+  if (first !== null) return state.deck[first].card.month === slot.card.month; // 앞면은 짝일 때만
+  // 첫 장으로 앞면을 고르려면 앞면인 짝이 판에 있어야 한다
+  return state.deck.some((s, i) => i !== index && !s.taken && faceUp(i) && s.card.month === slot.card.month);
 }
 
 export function flipCard(state, index) {
@@ -473,26 +482,31 @@ const hidden = (state) =>
 const pick = (list, rng) => list[Math.floor(rng() * list.length)];
 
 export function aiChooseFlip(state, rng = Math.random) {
-  const open = hidden(state).filter((i) => canFlip(state, i)); // 규칙상 고를 수 있는 칸만
-  if (open.length === 0) return null;
+  const alive = hidden(state).filter((i) => !state.flipped.includes(i));
+  const legal = alive.filter((i) => canFlip(state, i)); // 규칙상 지금 고를 수 있는 칸
+  if (legal.length === 0) return null;
   // 기억 + 화면에 앞면으로 남아 있는 카드는 모두 아는 카드로 취급한다
-  const known = [...new Set([...state.memory, ...state.revealed])].filter((i) => open.includes(i));
+  const known = [...new Set([...state.memory, ...state.revealed])].filter((i) => alive.includes(i));
   const monthOf = (i) => state.deck[i].card.month;
 
   if (state.flipped.length === 0) {
-    // 기억 속에 짝이 있으면 우선 선택
+    // 아는 짝이 있으면 우선 선택 (둘 중 지금 고를 수 있는 쪽을 먼저 집는다)
     for (const i of known) {
-      if (monthOf(i) !== 0 && known.some((j) => j !== i && monthOf(j) === monthOf(i))) return i;
+      if (monthOf(i) === 0) continue;
+      const partner = known.find((j) => j !== i && monthOf(j) === monthOf(i));
+      if (partner === undefined) continue;
+      if (legal.includes(i)) return i;
+      if (legal.includes(partner)) return partner;
     }
   } else {
     const first = state.flipped[0];
-    const match = known.find((j) => monthOf(j) === monthOf(first));
+    const match = known.find((j) => legal.includes(j) && monthOf(j) === monthOf(first));
     if (match !== undefined) return match;
   }
 
   // 모르는 카드를 우선 선택 (이미 본 카드를 또 뒤집는 낭비를 피함)
-  const unknown = open.filter((i) => !known.includes(i));
-  return pick(unknown.length > 0 ? unknown : open, rng);
+  const unknown = legal.filter((i) => !known.includes(i));
+  return pick(unknown.length > 0 ? unknown : legal, rng);
 }
 
 export function aiDecideGoStop(state, rng = Math.random) {

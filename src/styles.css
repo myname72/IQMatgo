@@ -466,3 +466,4 @@ body:has(.lobby) { background: radial-gradient(130% 70% at 50% 0%, #11505a 0%, #
 .payout-formula { margin-top: 6px; font-size: 0.82rem; opacity: 0.8; text-align: right; font-variant-numeric: tabular-nums; }
 /* 앞면 카드끼리 짝이 안 맞아 고를 수 없는 카드 */
 .slot-face.blocked { filter: grayscale(0.75) brightness(0.62); cursor: not-allowed; }
+.back-card.blocked { filter: brightness(0.55); cursor: not-allowed; }
