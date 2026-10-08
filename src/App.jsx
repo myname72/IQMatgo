@@ -301,7 +301,7 @@ function PvpLobby({ onEnter, resumeRoom }) {
   return (
     <section className="pvp-lobby" aria-label="사람 대전">
       <h3>⚔️ 사람 대전</h3>
-      <p className="account-note">AI 대전과 같은 규칙 · 점당 100포인트 · 10,000 포인트 이상 필요 · 한 수에 30초</p>
+      <p className="account-note">AI 대전과 같은 규칙 · 점당 100포인트 · 3,000 포인트 이상 필요 · 한 수에 30초</p>
       {resumeRoom && (
         <button className="btn btn-hard" onClick={() => onEnter(resumeRoom)} disabled={busy}>진행 중인 대전으로 돌아가기</button>
       )}
