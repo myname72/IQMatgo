@@ -590,7 +590,14 @@ describe('아이템 패', () => {
         const g = createGame('easy', seededRng(n), first);
         const hasPeek = g.startNote?.items.includes('엿보기');
         if (!hasPeek) {
-          expect(g.itemEvent).toBeNull();
+          // 엿보기가 아니어도 먹은 아이템이 있으면 연출이 나온다 (우선순위: 쓰리피 > 쌍피 > 섞기 > 초기화)
+          if (g.startNote) {
+            expect(g.itemEvent).toMatchObject({ n: 1, who: first });
+            expect(g.deck[g.itemEvent.index].taken).toBe(true);
+            expect(g.startNote.items).toContain(g.itemEvent.item === 'ssangpi' ? '쌍피' : g.itemEvent.item === 'tripi' ? '쓰리피' : g.itemEvent.item === 'shuffle' ? '섞기' : '초기화');
+          } else {
+            expect(g.itemEvent).toBeNull();
+          }
           continue;
         }
         expect(g.itemEvent).toMatchObject({ n: 1, who: first, item: 'peek' });

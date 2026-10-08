@@ -499,13 +499,14 @@ function useGameSounds(state) {
     const p = prev.current;
     prev.current = state;
     if (!state) return undefined;
-    if (!p || p.seed !== state.seed) {
-      audio.play('start');
-      return undefined;
-    }
-    const total = (g) => g.captured.player.length + g.captured.ai.length;
     const timers = [];
     const later = (ms, name) => timers.push(setTimeout(() => audio.play(name), ms));
+    if (!p || p.seed !== state.seed) {
+      audio.play('start');
+      if (state.itemEvent) later(450, state.itemEvent.item); // 시작 때 먹은 아이템 소리
+      return () => timers.forEach(clearTimeout);
+    }
+    const total = (g) => g.captured.player.length + g.captured.ai.length;
     const itemUsed = state.itemEvent && state.itemEvent.n !== (p.itemEvent?.n ?? 0);
 
     const rewarded = state.rewardEvent && state.rewardEvent.n !== (p.rewardEvent?.n ?? 0);
