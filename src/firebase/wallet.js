@@ -1,8 +1,5 @@
 import { firebaseConfig, firebaseEnabled } from './config.js';
 
-// 처음 가입할 때 받는 포인트 (임시 값. firestore.rules의 값과 같아야 한다)
-export const START_POINTS = 10000;
-
 let cached = null;
 // firebase 코드는 필요할 때만 불러온다 (게스트는 내려받지 않는다)
 async function load() {
@@ -90,22 +87,15 @@ export async function signOut() {
   await fb.A.signOut(fb.auth);
 }
 
-// 내 지갑(users/{uid})을 구독한다. 없으면 시작 포인트로 만든다. 포인트 변경은 서버(규칙)만 할 수 있다.
+// 내 지갑(users/{uid})을 구독한다. 없으면 서버가 만든다. 포인트 변경은 서버만 할 수 있다.
 export function watchWallet(user, cb, onError = () => {}) {
   let off = () => {};
   let dead = false;
   load().then(async (fb) => {
     if (!fb || dead) return;
     const ref = fb.F.doc(fb.fs, 'users', user.uid);
-    try {
-      const snap = await fb.F.getDoc(ref);
-      if (!snap.exists()) {
-        await fb.F.setDoc(ref, { points: START_POINTS, name: user.name, createdAt: fb.F.serverTimestamp() });
-      }
-    } catch (e) {
-      onError(e);
-      return;
-    }
+    // 지갑이 없으면 서버가 시작 포인트로 만든다. 서버 호출이 실패해도 이미 있는 지갑은 그대로 읽는다.
+    await call('ensureWallet', {}).catch(() => {});
     if (dead) return;
     off = fb.F.onSnapshot(ref, (s) => s.exists() && cb({ points: s.data().points }), onError);
   });

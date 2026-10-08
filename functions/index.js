@@ -2,7 +2,7 @@ import { initializeApp } from 'firebase-admin/app';
 import { getFirestore, FieldValue } from 'firebase-admin/firestore';
 import { onCall, HttpsError } from 'firebase-functions/v2/https';
 import { randomInt } from 'node:crypto';
-import { replayGame, rewardFor, todayKst, DAILY_AI_CAP, MIN_PLAY_MS, POINTS_PER_SCORE, AI_REWARD_RATE } from './lib/settle.js';
+import { replayGame, rewardFor, todayKst, DAILY_AI_CAP, MIN_PLAY_MS, POINTS_PER_SCORE, AI_REWARD_RATE, START_POINTS } from './lib/settle.js';
 
 initializeApp();
 const db = getFirestore();
@@ -13,6 +13,19 @@ const need = (req) => {
   if (req.auth.token.email_verified !== true) throw new HttpsError('failed-precondition', '이메일 인증이 필요합니다.');
   return req.auth.uid;
 };
+
+// 지갑 만들기: 처음 로그인했을 때 한 번만 시작 포인트로 만든다 (이미 있으면 그대로 둔다).
+// 클라이언트는 지갑을 직접 만들 수 없고, 시작 포인트는 서버 코드(settle.js)에서만 정한다.
+export const ensureWallet = onCall(opts, async (req) => {
+  const uid = need(req);
+  const ref = db.collection('users').doc(uid);
+  const name = String(req.auth.token.name ?? (req.auth.token.email ?? '').split('@')[0] ?? '').slice(0, 20);
+  await db.runTransaction(async (tx) => {
+    const snap = await tx.get(ref);
+    if (!snap.exists) tx.set(ref, { points: START_POINTS, name, createdAt: FieldValue.serverTimestamp() });
+  });
+  return { ok: true };
+});
 
 // 판 시작: 서버가 시드를 정해 준다. 포인트는 이 시드로 재생된 결과로만 정산된다.
 export const startAiGame = onCall(opts, async (req) => {

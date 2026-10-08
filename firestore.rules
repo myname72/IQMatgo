@@ -1,17 +1,10 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // 내 지갑: 본인만 읽을 수 있고, 처음 한 번만 시작 포인트로 만들 수 있다.
-    // 포인트 증감은 클라이언트가 못 하고, 서버(Cloud Functions, 관리자 권한)만 한다.
+    // 내 지갑: 본인만 읽을 수 있다. 만들기와 포인트 증감은 모두 서버(Cloud Functions, 관리자 권한)만 한다.
     match /users/{uid} {
       allow read: if request.auth != null && request.auth.uid == uid;
-      allow create: if request.auth != null && request.auth.uid == uid
-        && request.auth.token.email_verified == true
-        && request.resource.data.keys().hasOnly(['points', 'name', 'createdAt'])
-        && request.resource.data.points == 10000
-        && request.resource.data.createdAt == request.time
-        && request.resource.data.name is string;
-      allow update, delete: if false;
+      allow write: if false;
     }
   }
 }
