@@ -6,6 +6,7 @@ service cloud.firestore {
     match /users/{uid} {
       allow read: if request.auth != null && request.auth.uid == uid;
       allow create: if request.auth != null && request.auth.uid == uid
+        && request.auth.token.email_verified == true
         && request.resource.data.keys().hasOnly(['points', 'name', 'createdAt'])
         && request.resource.data.points == 10000
         && request.resource.data.createdAt == request.time

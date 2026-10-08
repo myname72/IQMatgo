@@ -27,7 +27,9 @@ export function watchUser(cb) {
   let dead = false;
   load().then((fb) => {
     if (!fb || dead) return;
-    off = fb.A.onAuthStateChanged(fb.auth, (u) => cb(u ? { uid: u.uid, name: u.displayName ?? '', photo: u.photoURL ?? '' } : null));
+    off = fb.A.onAuthStateChanged(fb.auth, (u) =>
+      cb(u ? { uid: u.uid, name: u.displayName || (u.email ?? '').split('@')[0], email: u.email ?? '', verified: u.emailVerified } : null),
+    );
   });
   return () => {
     dead = true;
@@ -48,6 +50,38 @@ export async function signIn() {
       throw e;
     }
   }
+}
+
+// 이메일 회원가입: 계정을 만들고 닉네임을 저장한 뒤 인증 메일을 보낸다
+export async function signUpEmail(email, password, name) {
+  const fb = await load();
+  const cred = await fb.A.createUserWithEmailAndPassword(fb.auth, email, password);
+  if (name) await fb.A.updateProfile(cred.user, { displayName: name });
+  await fb.A.sendEmailVerification(cred.user);
+}
+
+export async function signInEmail(email, password) {
+  const fb = await load();
+  await fb.A.signInWithEmailAndPassword(fb.auth, email, password);
+}
+
+export async function resetPassword(email) {
+  const fb = await load();
+  await fb.A.sendPasswordResetEmail(fb.auth, email);
+}
+
+export async function resendVerification() {
+  const fb = await load();
+  if (fb.auth.currentUser) await fb.A.sendEmailVerification(fb.auth.currentUser);
+}
+
+// 인증을 마친 뒤 상태를 새로 읽는다 (페이지를 새로고침한 것과 같은 효과)
+export async function reloadUser() {
+  const fb = await load();
+  if (!fb.auth.currentUser) return;
+  await fb.auth.currentUser.reload();
+  await fb.auth.currentUser.getIdToken(true);
+  window.location.reload();
 }
 
 export async function signOut() {

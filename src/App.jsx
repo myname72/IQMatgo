@@ -170,16 +170,76 @@ function SweepToast({ event }) {
   );
 }
 
+function EmailForm({ acc, onDone }) {
+  const [mode, setMode] = useState('in'); // in | up | reset
+  const [email, setEmail] = useState('');
+  const [pw, setPw] = useState('');
+  const [name, setName] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [info, setInfo] = useState('');
+  const submit = async (e) => {
+    e.preventDefault();
+    setBusy(true);
+    setInfo('');
+    try {
+      if (mode === 'in') await acc.signInEmail(email.trim(), pw);
+      else if (mode === 'up') await acc.signUpEmail(email.trim(), pw, name.trim());
+      else {
+        await acc.resetPassword(email.trim());
+        setInfo('비밀번호 재설정 메일을 보냈습니다. 메일함을 확인해 주세요.');
+        setBusy(false);
+        return;
+      }
+      onDone();
+    } catch {
+      /* 오류 문구는 acc.error로 표시된다 */
+    }
+    setBusy(false);
+  };
+  return (
+    <form className="email-form" onSubmit={submit}>
+      <div className="email-tabs">
+        <button type="button" className={mode === 'in' ? 'on' : ''} onClick={() => { setMode('in'); acc.setError(''); }}>로그인</button>
+        <button type="button" className={mode === 'up' ? 'on' : ''} onClick={() => { setMode('up'); acc.setError(''); }}>회원가입</button>
+      </div>
+      {mode === 'up' && <input placeholder="닉네임" value={name} maxLength={12} onChange={(e) => setName(e.target.value)} required autoComplete="nickname" />}
+      <input type="email" placeholder="이메일" value={email} onChange={(e) => setEmail(e.target.value)} required autoComplete="email" />
+      {mode !== 'reset' && <input type="password" placeholder="비밀번호 (6자 이상)" value={pw} onChange={(e) => setPw(e.target.value)} required minLength={6} autoComplete={mode === 'up' ? 'new-password' : 'current-password'} />}
+      <button className="btn btn-normal account-btn" disabled={busy}>
+        {mode === 'in' ? '로그인' : mode === 'up' ? '가입하고 인증 메일 받기' : '재설정 메일 보내기'}
+      </button>
+      {mode === 'in' && <button type="button" className="account-link" onClick={() => { setMode('reset'); acc.setError(''); }}>비밀번호를 잊었어요</button>}
+      {mode === 'reset' && <button type="button" className="account-link" onClick={() => { setMode('in'); setInfo(''); }}>로그인으로 돌아가기</button>}
+      {info && <span className="account-note">{info}</span>}
+    </form>
+  );
+}
+
 function AccountBar() {
   const acc = useAccount();
+  const [open, setOpen] = useState(false);
   if (acc.status === 'off') return null;
   return (
     <div className="account-bar">
       {acc.status === 'loading' && <span className="account-note">계정 확인 중…</span>}
       {acc.status === 'out' && (
         <>
-          <button className="btn btn-normal account-btn" onClick={acc.signIn}>Google로 로그인</button>
-          <span className="account-note">로그인하면 포인트가 저장됩니다. 로그인 없이도 연습은 가능해요.</span>
+          <div className="account-actions">
+            <button className="btn btn-normal account-btn" onClick={acc.signIn}>Google로 로그인</button>
+            <button className="btn btn-easy account-btn" onClick={() => setOpen((v) => !v)}>이메일로 로그인 / 가입</button>
+          </div>
+          {open && <EmailForm acc={acc} onDone={() => setOpen(false)} />}
+          {!open && <span className="account-note">로그인하면 포인트가 저장됩니다. 로그인 없이도 연습은 가능해요.</span>}
+        </>
+      )}
+      {acc.status === 'unverified' && (
+        <>
+          <span className="account-note">{acc.user.email} 로 인증 메일을 보냈습니다. 메일의 링크를 누른 뒤 아래 버튼을 눌러 주세요.</span>
+          <div className="account-actions">
+            <button className="btn btn-normal account-btn" onClick={acc.reloadUser}>인증했어요</button>
+            <button className="account-link" onClick={acc.resendVerification}>메일 다시 보내기</button>
+            <button className="account-link" onClick={acc.signOut}>로그아웃</button>
+          </div>
         </>
       )}
       {acc.status === 'in' && (
