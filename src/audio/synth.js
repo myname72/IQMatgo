@@ -64,6 +64,17 @@ function pluck(ctx, out, t, { freq, dur = 1.4, vol = 0.2 }) {
   noise(ctx, lp, t, { dur: 0.04, vol: vol * 0.5, freq: 4000, q: 0.7 });
 }
 
+// 금관 소리: 톱니파를 저역 통과시켜 부드럽게
+function brass(ctx, out, t, { freq, dur = 0.4, vol = 0.12 }) {
+  const lp = ctx.createBiquadFilter();
+  lp.type = 'lowpass';
+  lp.frequency.setValueAtTime(900, t);
+  lp.frequency.linearRampToValueAtTime(3200, t + 0.08);
+  lp.connect(out);
+  tone(ctx, lp, t, { freq, type: 'sawtooth', dur, vol, attack: 0.02 });
+  tone(ctx, lp, t, { freq: freq * 1.003, type: 'square', dur, vol: vol * 0.4, attack: 0.02 });
+}
+
 // 장구 소리
 function drum(ctx, out, t, { low = true, vol = 0.3 }) {
   if (low) {
@@ -158,10 +169,47 @@ export const SFX = {
     bell(ctx, out, t, { freq: 196, dur: 2.0, vol: 0.28 });
     drum(ctx, out, t, { low: true, vol: 0.4 });
   },
-  win: (ctx, out, t) => {
-    [72, 76, 79, 84].forEach((n, i) => pluck(ctx, out, t + i * 0.13, { freq: midi(n), dur: 1.2, vol: 0.22 }));
-    [72, 76, 79, 84].forEach((n) => tone(ctx, out, t + 0.62, { freq: midi(n), type: 'triangle', dur: 1.4, vol: 0.12 }));
-    drum(ctx, out, t + 0.62, { low: true, vol: 0.32 });
+  // 승리: 약 7초짜리 신나는 팡파르 (북 + 금관 + 반짝이는 마무리)
+  win: (ctx, dest, t) => {
+    const out = ctx.createGain(); // 음량이 큰 편이라 살짝 낮춘다
+    out.gain.value = 0.72;
+    out.connect(dest);
+    const B = 0.36; // 한 박 (약 166bpm)
+    // 1) 올라가는 런
+    [60, 64, 67, 72, 76, 79, 84].forEach((n, i) => pluck(ctx, out, t + i * 0.08, { freq: midi(n), dur: 0.5, vol: 0.2 }));
+    noise(ctx, out, t, { dur: 0.6, vol: 0.12, type: 'bandpass', freq: 800, freqEnd: 7000, q: 0.8 });
+    // 2) 주제 선율 (midi, 박 길이)
+    const start = t + 0.75;
+    const tune = [
+      [79, 0.5], [79, 0.5], [84, 1], [83, 0.5], [81, 0.5], [79, 1],
+      [76, 0.5], [79, 0.5], [84, 1], [86, 0.5], [88, 0.5], [91, 1],
+      [88, 0.5], [88, 0.5], [86, 0.5], [84, 0.5], [86, 1], [83, 1],
+      [84, 0.5], [88, 0.5], [91, 0.5], [88, 0.5], [84, 1], [79, 1],
+    ];
+    let at = start;
+    for (const [n, beats] of tune) {
+      const d = beats * B;
+      brass(ctx, out, at, { freq: midi(n), dur: d * 0.95, vol: 0.13 });
+      tone(ctx, out, at, { freq: midi(n + 12), type: 'sine', dur: d * 0.6, vol: 0.05 });
+      at += d;
+    }
+    // 3) 반주: 박마다 북 + 엇박 심벌 + 베이스, 마디마다 화음
+    const beats = Math.round((at - start) / B);
+    const bass = [48, 48, 55, 55, 53, 53, 55, 55];
+    for (let k = 0; k < beats; k++) {
+      const bt = start + k * B;
+      drum(ctx, out, bt, { low: true, vol: 0.26 });
+      drum(ctx, out, bt + B / 2, { low: false, vol: 0.12 });
+      tone(ctx, out, bt, { freq: midi(bass[Math.floor(k / 2) % bass.length]), type: 'triangle', dur: B * 0.9, vol: 0.16 });
+      if (k % 4 === 0) [60, 64, 67].forEach((n) => brass(ctx, out, bt, { freq: midi(n), dur: B * 1.8, vol: 0.06 }));
+    }
+    // 4) 마무리: 큰 화음 + 심벌 + 반짝이
+    const end = at + 0.1;
+    [60, 64, 67, 72, 76, 79].forEach((n) => brass(ctx, out, end, { freq: midi(n), dur: 2.2, vol: 0.09 }));
+    [84, 88, 91, 96].forEach((n, i) => bell(ctx, out, end + i * 0.07, { freq: midi(n), dur: 2.4, vol: 0.12 }));
+    drum(ctx, out, end, { low: true, vol: 0.4 });
+    noise(ctx, out, end, { dur: 1.6, vol: 0.16, type: 'highpass', freq: 5000 });
+    for (let i = 0; i < 10; i++) tone(ctx, out, end + 0.4 + i * 0.12, { freq: midi(93 + (i * 5) % 12), type: 'sine', dur: 0.3, vol: 0.07 });
   },
   lose: (ctx, out, t) => {
     [67, 63, 60, 55].forEach((n, i) => pluck(ctx, out, t + i * 0.2, { freq: midi(n), dur: 1.2, vol: 0.2 }));
