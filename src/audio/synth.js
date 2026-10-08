@@ -169,12 +169,12 @@ export const SFX = {
     bell(ctx, out, t, { freq: 196, dur: 2.0, vol: 0.28 });
     drum(ctx, out, t, { low: true, vol: 0.4 });
   },
-  // 승리: 약 7초짜리 신나는 팡파르 (북 + 금관 + 반짝이는 마무리)
+  // 승리: 약 6초짜리 신나는 팡파르 (본 선율 4초) (북 + 금관 + 반짝이는 마무리)
   win: (ctx, dest, t) => {
     const out = ctx.createGain(); // 음량이 큰 편이라 살짝 낮춘다
     out.gain.value = 0.72;
     out.connect(dest);
-    const B = 0.36; // 한 박 (약 166bpm)
+    const B = 1 / 3; // 한 박 (180bpm) — 선율 12박 = 4초
     // 1) 올라가는 런
     [60, 64, 67, 72, 76, 79, 84].forEach((n, i) => pluck(ctx, out, t + i * 0.08, { freq: midi(n), dur: 0.5, vol: 0.2 }));
     noise(ctx, out, t, { dur: 0.6, vol: 0.12, type: 'bandpass', freq: 800, freqEnd: 7000, q: 0.8 });
@@ -183,8 +183,7 @@ export const SFX = {
     const tune = [
       [79, 0.5], [79, 0.5], [84, 1], [83, 0.5], [81, 0.5], [79, 1],
       [76, 0.5], [79, 0.5], [84, 1], [86, 0.5], [88, 0.5], [91, 1],
-      [88, 0.5], [88, 0.5], [86, 0.5], [84, 0.5], [86, 1], [83, 1],
-      [84, 0.5], [88, 0.5], [91, 0.5], [88, 0.5], [84, 1], [79, 1],
+      [88, 0.5], [88, 0.5], [86, 0.5], [84, 0.5], [86, 0.5], [83, 0.5], [84, 1],
     ];
     let at = start;
     for (const [n, beats] of tune) {
@@ -205,11 +204,11 @@ export const SFX = {
     }
     // 4) 마무리: 큰 화음 + 심벌 + 반짝이
     const end = at + 0.1;
-    [60, 64, 67, 72, 76, 79].forEach((n) => brass(ctx, out, end, { freq: midi(n), dur: 2.2, vol: 0.09 }));
-    [84, 88, 91, 96].forEach((n, i) => bell(ctx, out, end + i * 0.07, { freq: midi(n), dur: 2.4, vol: 0.12 }));
+    [60, 64, 67, 72, 76, 79].forEach((n) => brass(ctx, out, end, { freq: midi(n), dur: 1.6, vol: 0.09 }));
+    [84, 88, 91, 96].forEach((n, i) => bell(ctx, out, end + i * 0.07, { freq: midi(n), dur: 1.8, vol: 0.12 }));
     drum(ctx, out, end, { low: true, vol: 0.4 });
-    noise(ctx, out, end, { dur: 1.6, vol: 0.16, type: 'highpass', freq: 5000 });
-    for (let i = 0; i < 10; i++) tone(ctx, out, end + 0.4 + i * 0.12, { freq: midi(93 + (i * 5) % 12), type: 'sine', dur: 0.3, vol: 0.07 });
+    noise(ctx, out, end, { dur: 1.2, vol: 0.16, type: 'highpass', freq: 5000 });
+    for (let i = 0; i < 6; i++) tone(ctx, out, end + 0.4 + i * 0.12, { freq: midi(93 + (i * 5) % 12), type: 'sine', dur: 0.3, vol: 0.07 });
   },
   lose: (ctx, out, t) => {
     [67, 63, 60, 55].forEach((n, i) => pluck(ctx, out, t + i * 0.2, { freq: midi(n), dur: 1.2, vol: 0.2 }));
