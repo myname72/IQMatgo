@@ -390,3 +390,68 @@ body:has(.burst-bomb) #root { animation: bomb-shake 0.6s ease-out; }
 .rules-box { position: relative; width: min(640px, 100%); max-height: 100%; overflow-y: auto; background: #16213e; border: 1px solid rgba(255,255,255,0.2); border-radius: 16px; padding: 20px 16px 16px; display: flex; flex-direction: column; gap: 12px; align-items: center; }
 .rules-close { position: absolute; top: 8px; right: 10px; background: none; border: 0; color: #fff; font-size: 1.3rem; cursor: pointer; }
 .rules-box .rules { text-align: left; }
+
+/* ===== 로비 (카지노풍 게임 로비) ===== */
+body:has(.lobby) { background: radial-gradient(130% 70% at 50% 0%, #11505a 0%, #0a2c3d 42%, #061522 100%); }
+.lobby { width: min(760px, 100%); min-height: 100vh; margin: 0 auto; display: flex; flex-direction: column; gap: 14px; padding: 0 0 calc(env(safe-area-inset-bottom, 0px) + 8px); }
+
+.lobby-top { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: calc(env(safe-area-inset-top, 0px) + 8px) 12px 8px; background: linear-gradient(180deg, rgba(20,28,46,0.96), rgba(12,18,32,0.9)); border-bottom: 1px solid rgba(120,150,190,0.35); box-shadow: 0 4px 16px rgba(0,0,0,0.45); }
+.lobby-profile { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.avatar { flex: none; width: 46px; height: 46px; border-radius: 50%; display: grid; place-items: center; font-size: 1.3rem; font-weight: 900; color: #3a2a00; background: radial-gradient(circle at 35% 30%, #fff3b0, #f2b929 70%, #b9810d); border: 2px solid #fff3c4; box-shadow: 0 0 12px rgba(255,200,60,0.5); }
+.profile-text { display: flex; flex-direction: column; align-items: flex-start; min-width: 0; }
+.profile-text b { font-size: 1.05rem; max-width: 9.5rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.profile-link { background: none; border: 0; padding: 0; color: #8fc4ff; font: inherit; font-size: 0.82rem; text-decoration: underline; cursor: pointer; }
+.lobby-icons { display: flex; align-items: center; gap: 6px; }
+.top-icon { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px; width: 52px; height: 48px; border-radius: 10px; border: 1px solid rgba(120,150,190,0.4); background: linear-gradient(180deg, #2a3a56, #172236); color: #cfe3ff; cursor: pointer; font: inherit; }
+.top-icon span { font-size: 1.3rem; line-height: 1; }
+.top-icon small { font-size: 0.68rem; }
+.lobby .sound-controls.inline .icon-btn { width: 48px; height: 48px; border-radius: 10px; border: 1px solid rgba(120,150,190,0.4); background: linear-gradient(180deg, #2a3a56, #172236); }
+
+.lobby-logo { text-align: center; font-size: clamp(2rem, 9vw, 3rem); font-weight: 900; letter-spacing: 0.06em; color: #eaf6ff; text-shadow: 0 0 18px rgba(80,200,255,0.55), 0 3px 0 #0a2a40; margin: 4px 0 0; }
+.lobby-logo span { color: #ffd84d; text-shadow: 0 0 18px rgba(255,200,60,0.6), 0 3px 0 #6b4a00; }
+
+.lobby-resume { margin: 0 14px; padding: 10px; border-radius: 12px; border: 2px solid #ffd84d; background: linear-gradient(180deg, #a52a3a, #6d1824); color: #fff; font: inherit; font-weight: 800; cursor: pointer; animation: pulse-urgent 1.6s ease-in-out infinite; }
+
+.lobby-main { --chip: clamp(150px, 46vw, 210px); display: flex; flex-direction: column; align-items: center; gap: 16px; padding: 0 14px; }
+@media (min-width: 640px) { .lobby-main { --chip: 220px; display: grid; grid-template-columns: auto 1fr; gap: 28px; align-items: center; } }
+
+.chip-btn { position: relative; width: var(--chip); aspect-ratio: 1; flex: none; border: 0; background: none; padding: 0; border-radius: 50%; cursor: pointer; font: inherit; filter: drop-shadow(0 12px 22px rgba(0,0,0,0.6)); transition: transform 0.15s; }
+.chip-btn:hover:not(:disabled) { transform: scale(1.03); }
+.chip-btn:active:not(:disabled) { transform: scale(0.97); }
+.chip-ring { position: absolute; inset: 0; border-radius: 50%; background: repeating-conic-gradient(from 8deg, #2f6fd1 0 15deg, #e8f2ff 15deg 30deg); box-shadow: inset 0 0 0 5px rgba(255,255,255,0.18), inset 0 0 22px rgba(0,0,0,0.35); }
+.chip-face { position: absolute; inset: 12%; border-radius: 50%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; background: radial-gradient(circle at 50% 30%, #2c4d78, #0d1b33 72%); border: 3px solid #7fb4ff; box-shadow: inset 0 0 20px rgba(80,160,255,0.5), 0 0 16px rgba(60,160,255,0.45); }
+.chip-title { font-size: clamp(1.4rem, 6.6vw, 2.2rem); font-weight: 900; color: #5fd6ff; text-shadow: 0 0 12px rgba(60,200,255,0.9); line-height: 1; }
+.chip-title b { color: #fff; }
+.chip-sub { font-size: 0.85rem; font-weight: 700; color: #cfe6ff; }
+.chip-note { font-size: 0.62rem; color: #9db8d8; background: rgba(0,0,0,0.35); padding: 1px 8px; border-radius: 999px; }
+.chip-btn.locked { filter: grayscale(0.5) drop-shadow(0 12px 22px rgba(0,0,0,0.6)); }
+
+.plates { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; width: 100%; }
+.plate { position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; min-height: 76px; padding: 8px 6px; border-radius: 12px; cursor: pointer; font: inherit; color: #fff; border: 2px solid #5b7396; background: linear-gradient(180deg, #34476a 0%, #1d2a44 55%, #162036 100%); box-shadow: inset 0 2px 0 rgba(255,255,255,0.18), inset 0 -3px 8px rgba(0,0,0,0.4), 0 5px 12px rgba(0,0,0,0.4); text-align: center; }
+.plate b { font-size: 1.12rem; color: #6fdcff; text-shadow: 0 0 10px rgba(60,200,255,0.55); }
+.plate small { font-size: 0.72rem; color: #a9bfdc; }
+.plate:hover:not(:disabled) { border-color: #8fd0ff; }
+.plate:active:not(:disabled) { transform: translateY(2px); }
+.plate-ai { border-color: #c9a03a; background: linear-gradient(180deg, #5a4a24 0%, #33290f 55%, #261e0b 100%); }
+.plate-ai b { color: #ffd84d; text-shadow: 0 0 10px rgba(255,200,60,0.6); }
+.plate.locked { opacity: 0.7; }
+.plate-code { flex-direction: row; gap: 6px; cursor: default; }
+.plate-code .code-input { width: 100%; min-width: 0; padding: 0.45rem 0.4rem; font-size: 0.95rem; letter-spacing: 0.1em; }
+.code-go { flex: none; padding: 0.5rem 0.7rem; border-radius: 8px; border: 0; background: linear-gradient(180deg, #4fa5ff, #2a63c9); color: #fff; font: inherit; font-weight: 800; cursor: pointer; }
+.code-go:disabled { opacity: 0.5; }
+
+.lobby-error { margin: 0 14px; text-align: center; color: #ff9a9a; font-size: 0.85rem; }
+
+.lobby-rooms { margin: 0 14px; padding: 10px; border-radius: 14px; background: rgba(8,20,36,0.7); border: 1px solid rgba(120,150,190,0.35); display: flex; flex-direction: column; gap: 8px; }
+.lobby-rooms h3 { font-size: 1rem; color: #cfe6ff; }
+.lobby-rooms h3 em { font-style: normal; background: #ff5a6a; color: #fff; border-radius: 999px; padding: 0 8px; margin-left: 4px; font-size: 0.85rem; }
+.lobby-empty { font-size: 0.82rem; opacity: 0.7; }
+.room-card { display: flex; align-items: center; gap: 10px; padding: 8px 10px; border-radius: 12px; background: linear-gradient(180deg, #2a3a56, #172236); border: 1px solid #5b7396; }
+.room-avatar { flex: none; width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center; font-weight: 900; color: #3a2a00; background: radial-gradient(circle at 35% 30%, #fff3b0, #f2b929 70%, #b9810d); }
+.room-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 700; }
+.room-join { flex: none; padding: 0.4rem 1rem; border-radius: 8px; border: 0; background: linear-gradient(180deg, #55d98a, #1f9a55); color: #06260f; font: inherit; font-weight: 900; cursor: pointer; }
+
+.lobby-bottom { margin-top: auto; display: flex; align-items: center; gap: 12px; padding: 10px 16px; background: linear-gradient(180deg, rgba(20,28,46,0.96), rgba(10,14,26,0.98)); border-top: 1px solid rgba(120,150,190,0.35); }
+.coin-icon { flex: none; width: 40px; height: 40px; border-radius: 50%; background: radial-gradient(circle, #0d1b33 38%, transparent 40%), repeating-conic-gradient(#2f6fd1 0 20deg, #e8f2ff 20deg 40deg); border: 2px solid #9ec6ff; box-shadow: 0 0 10px rgba(80,160,255,0.5); }
+.lobby-bottom small { display: block; font-size: 0.72rem; color: #9db8d8; }
+.lobby-bottom b { font-size: 1.35rem; color: #ffe27a; text-shadow: 0 0 10px rgba(255,200,60,0.4); font-variant-numeric: tabular-nums; }

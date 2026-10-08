@@ -282,14 +282,15 @@ function SettleLine({ settle, winner }) {
   return <p className={`settle-line ${settle.earned > 0 ? 'earned' : ''}`}>{text}</p>;
 }
 
-function PvpLobby({ onEnter, resumeRoom }) {
+// 로비 본문: 자동입장(빠른 대전) 칩 + 방 선택 판 + 열린 방 목록
+function LobbyBody({ onStart, onEnter, resumeRoom, onLogin }) {
   const acc = useContext(AccountContext);
   const [code, setCode] = useState('');
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
   const [rooms, setRooms] = useState([]); // 열린 방 목록 (방장이 AI와 연습하며 기다리는 방)
-  // 열린 방 목록을 주기적으로 새로 읽는다 (화면이 보일 때만)
   const loggedIn = acc.status === 'in';
+  // 열린 방 목록을 주기적으로 새로 읽는다 (화면이 보일 때만)
   useEffect(() => {
     if (!loggedIn) return undefined;
     let dead = false;
@@ -307,6 +308,10 @@ function PvpLobby({ onEnter, resumeRoom }) {
     };
   }, [loggedIn]);
   const run = async (fn) => {
+    if (!loggedIn) {
+      onLogin();
+      return;
+    }
     setBusy(true);
     setErr('');
     try {
@@ -317,35 +322,54 @@ function PvpLobby({ onEnter, resumeRoom }) {
     }
     setBusy(false);
   };
-  if (acc.status !== 'in') return null;
   return (
-    <section className="pvp-lobby" aria-label="사람 대전">
-      <h3>⚔️ 사람 대전</h3>
-      <p className="account-note">점당 100포인트 · 3,000 포인트 이상 · 한 수 30초 · 방을 만들면 AI와 연습하며 기다리다가 누가 들어오면 바로 대전</p>
-      {resumeRoom && (
-        <button className="btn btn-hard" onClick={() => onEnter(resumeRoom)} disabled={busy}>진행 중인 대전으로 돌아가기</button>
+    <>
+      {resumeRoom && loggedIn && (
+        <button className="lobby-resume" onClick={() => onEnter(resumeRoom)} disabled={busy}>▶ 진행 중인 대전으로 돌아가기</button>
       )}
-      <div className="account-actions">
-        <button className="btn btn-normal account-btn" onClick={() => run(quickMatch)} disabled={busy}>빠른 대전</button>
-        <button className="btn btn-easy account-btn" onClick={() => run(() => createRoom(false))} disabled={busy}>방 만들기</button>
-        <button className="btn btn-primary account-btn" onClick={() => run(() => createRoom(true))} disabled={busy}>🔒 비밀방 만들기</button>
+      <div className="lobby-main">
+        <button className={`chip-btn ${loggedIn ? '' : 'locked'}`} onClick={() => run(quickMatch)} disabled={busy} aria-label="자동입장 (빠른 대전)">
+          <span className="chip-ring" aria-hidden="true" />
+          <span className="chip-face">
+            <span className="chip-title">자동<b>입장</b></span>
+            <span className="chip-sub">{loggedIn ? '빠른 대전' : '로그인 필요'}</span>
+            <span className="chip-note">점당 100P · 3,000P 이상</span>
+          </span>
+        </button>
+        <div className="plates">
+          <button className="plate plate-ai" onClick={() => onStart('easy')}>
+            <b>AI 대전</b>
+            <small>혼자 연습 · 이기면 포인트</small>
+          </button>
+          <button className={`plate ${loggedIn ? '' : 'locked'}`} onClick={() => run(() => createRoom(false))} disabled={busy}>
+            <b>방 만들기</b>
+            <small>AI와 연습하며 대기</small>
+          </button>
+          <button className={`plate ${loggedIn ? '' : 'locked'}`} onClick={() => run(() => createRoom(true))} disabled={busy}>
+            <b>🔒 비밀방</b>
+            <small>코드로만 입장</small>
+          </button>
+          <form className={`plate plate-code ${loggedIn ? '' : 'locked'}`} onSubmit={(e) => { e.preventDefault(); run(() => joinByCode(code.trim())); }}>
+            <input className="code-input" inputMode="numeric" pattern="[0-9]*" maxLength={4} placeholder="비밀방 코드" value={code} onChange={(e) => setCode(e.target.value.replace(/\D/g, ''))} aria-label="비밀방 코드 4자리" />
+            <button className="code-go" disabled={busy || (loggedIn && code.length !== 4)}>입장</button>
+          </form>
+        </div>
       </div>
-      <div className="room-list" aria-label="열린 방">
-        <strong>열린 방 {rooms.length > 0 ? `(${rooms.length})` : ''}</strong>
-        {rooms.length === 0 && <span className="account-note">지금 열린 방이 없습니다. 방을 만들어 기다려 보세요.</span>}
-        {rooms.map((r) => (
-          <div className="room-row" key={r.id}>
-            <span>{r.host}님의 방</span>
-            <button className="btn btn-hard account-btn" onClick={() => run(() => joinById(r.id))} disabled={busy}>입장</button>
-          </div>
-        ))}
-      </div>
-      <form className="account-actions" onSubmit={(e) => { e.preventDefault(); run(() => joinByCode(code.trim())); }}>
-        <input className="code-input" inputMode="numeric" pattern="[0-9]*" maxLength={4} placeholder="비밀방 코드 4자리" value={code} onChange={(e) => setCode(e.target.value.replace(/\D/g, ''))} />
-        <button className="btn btn-primary account-btn" disabled={busy || code.length !== 4}>🔒 비밀방 입장</button>
-      </form>
-      {err && <span className="account-error">{err}</span>}
-    </section>
+      {err && <p className="lobby-error">{err}</p>}
+      {loggedIn && (
+        <section className="lobby-rooms" aria-label="열린 방">
+          <h3>열린 방 {rooms.length > 0 ? <em>{rooms.length}</em> : null}</h3>
+          {rooms.length === 0 && <p className="lobby-empty">지금 열린 방이 없습니다. 방을 만들어 기다려 보세요.</p>}
+          {rooms.map((r) => (
+            <div className="room-card" key={r.id}>
+              <span className="room-avatar" aria-hidden="true">{(r.host || '?').slice(0, 1)}</span>
+              <span className="room-name">{r.host}님의 방</span>
+              <button className="room-join" onClick={() => run(() => joinById(r.id))} disabled={busy}>입장</button>
+            </div>
+          ))}
+        </section>
+      )}
+    </>
   );
 }
 
@@ -384,29 +408,62 @@ function RulesModal({ onClose }) {
 function Menu({ onStart, onPvp }) {
   const acc = useContext(AccountContext);
   const [showRules, setShowRules] = useState(false);
+  const [showAuth, setShowAuth] = useState(false);
+  const loggedIn = acc.status === 'in';
+  const name = acc.user?.name || '플레이어';
   return (
-    <div className="screen menu-screen">
-      <h1 className="title">IQ 맞고</h1>
-      <p className="subtitle">카드를 뒤집어 같은 월을 찾고, 맞고 규칙으로 점수를 겨루세요!</p>
-      <div className="row">
-        {DIFFICULTIES.map((d) => (
-          <button key={d.key} className={`btn ${d.cls}`} onClick={() => onStart(d.key)}>
-            <span>{d.label}</span>
-            <small>(AI 기억력: {MEMORY_LIMIT[d.key]}장{REVEAL_TURNS[d.key] > 0 && ` · 틀린 카드 ${REVEAL_TURNS[d.key]}턴 유지`})</small>
+    <div className="lobby">
+      <header className="lobby-top">
+        <div className="lobby-profile">
+          <span className="avatar" aria-hidden="true">{loggedIn ? name.slice(0, 1) : '?'}</span>
+          {loggedIn ? (
+            <div className="profile-text">
+              <b>{name}</b>
+              <button className="profile-link" onClick={acc.signOut}>로그아웃</button>
+            </div>
+          ) : (
+            <div className="profile-text">
+              <b>게스트</b>
+              <button className="profile-link" onClick={() => setShowAuth(true)}>
+                {acc.status === 'unverified' ? '이메일 인증 필요' : acc.status === 'loading' ? '확인 중…' : '로그인 / 가입'}
+              </button>
+            </div>
+          )}
+        </div>
+        <div className="lobby-icons">
+          <button className="top-icon" onClick={() => setShowRules(true)} aria-label="게임 규칙">
+            <span aria-hidden="true">📖</span>
+            <small>규칙</small>
           </button>
-        ))}
-        <button className="btn btn-primary" onClick={() => setShowRules(true)}>
-          <span>📖 게임 규칙</span>
-        </button>
-      </div>
-      <AccountBar />
-      <PvpLobby onEnter={onPvp} resumeRoom={acc.activeRoom} />
+          <SoundControls inline />
+        </div>
+      </header>
+
+      <h1 className="lobby-logo">IQ <span>맞고</span></h1>
+
+      <LobbyBody onStart={onStart} onEnter={onPvp} resumeRoom={acc.activeRoom} onLogin={() => setShowAuth(true)} />
+
+      <footer className="lobby-bottom">
+        <span className="coin-icon" aria-hidden="true" />
+        <div>
+          <small>보유 포인트</small>
+          <b>{loggedIn ? (acc.points === null ? '…' : acc.points.toLocaleString()) : '로그인하면 저장됩니다'}</b>
+        </div>
+      </footer>
+
+      {showAuth && (
+        <div className="rules-modal" role="dialog" aria-label="로그인" onClick={() => setShowAuth(false)}>
+          <div className="rules-box" onClick={(e) => e.stopPropagation()}>
+            <button className="rules-close" onClick={() => setShowAuth(false)} aria-label="닫기">✕</button>
+            <AccountBar />
+          </div>
+        </div>
+      )}
       {showRules && <RulesModal onClose={() => setShowRules(false)} />}
     </div>
   );
 }
 
-// 오른쪽 아래에 떠 있는 배경음악·효과음 켜기/끄기 버튼
 function SoundControls({ inline = false }) {
   const st = useSyncExternalStore(audio.subscribe, audio.getSettings);
   return (
@@ -600,7 +657,7 @@ export default function App() {
         <GameView state={state} send={send} onStart={startGame} settle={settle} remoteEnter={setPvpRoom} />
       )}
       {notice && <div className="net-toast" role="status">{notice}</div>}
-      {!pvpRoom && (!state || state.phase === 'over') && <SoundControls />}
+      {!pvpRoom && state?.phase === 'over' && <SoundControls />}
     </AccountContext.Provider>
   );
 }
