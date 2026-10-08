@@ -140,7 +140,7 @@ const randomCode = () => String(Math.floor(1000 + Math.random() * 9000));
 // ---- 방 만들기 (코드로 친구와 대전) ----
 export const createRoom = onCall(opts, async (req) => {
   const uid = need(req);
-  const difficulty = ['easy', 'normal', 'hard'].includes(req.data?.difficulty) ? req.data.difficulty : 'normal';
+  const difficulty = 'easy'; // AI 대전과 같은 규칙(틀린 카드 5턴 유지)만 쓴다
   return db.runTransaction(async (tx) => {
     const me = await loadUser(tx, uid);
     const active = await activeRoomOf(tx, me);
@@ -204,7 +204,7 @@ export const quickMatch = onCall(opts, async (req) => {
       }
     }
     const ref = db.collection('rooms').doc();
-    tx.set(ref, newRoomData(uid, nameOf(me.data()), 'normal', true, randomCode(), now));
+    tx.set(ref, newRoomData(uid, nameOf(me.data()), 'easy', true, randomCode(), now));
     tx.update(userRef(uid), { activeRoom: ref.id });
     return { roomId: ref.id, waiting: true };
   });

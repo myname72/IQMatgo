@@ -26,10 +26,9 @@ import {
   REVEAL_TURNS,
 } from './game/engine.js';
 
+// AI 대전과 사람 대전은 같은 규칙(틀린 카드 5턴 유지)을 쓴다
 const DIFFICULTIES = [
-  { key: 'easy', label: '쉬움', cls: 'btn-easy' },
-  { key: 'normal', label: '보통', cls: 'btn-normal' },
-  { key: 'hard', label: '어려움', cls: 'btn-hard' },
+  { key: 'easy', label: 'AI 대전', cls: 'btn-easy' },
 ];
 
 // 게임마다 고정된 0~1 난수 (카드 위치별)
@@ -302,13 +301,13 @@ function PvpLobby({ onEnter, resumeRoom }) {
   return (
     <section className="pvp-lobby" aria-label="사람 대전">
       <h3>⚔️ 사람 대전</h3>
-      <p className="account-note">점당 100포인트를 걸고 겨룹니다 · 10,000 포인트 이상 필요 · 한 수에 30초</p>
+      <p className="account-note">AI 대전과 같은 규칙 · 점당 100포인트 · 10,000 포인트 이상 필요 · 한 수에 30초</p>
       {resumeRoom && (
         <button className="btn btn-hard" onClick={() => onEnter(resumeRoom)} disabled={busy}>진행 중인 대전으로 돌아가기</button>
       )}
       <div className="account-actions">
         <button className="btn btn-normal account-btn" onClick={() => run(quickMatch)} disabled={busy}>빠른 대전</button>
-        <button className="btn btn-easy account-btn" onClick={() => run(() => createRoom('normal'))} disabled={busy}>방 만들기</button>
+        <button className="btn btn-easy account-btn" onClick={() => run(() => createRoom('easy'))} disabled={busy}>방 만들기</button>
       </div>
       <form className="account-actions" onSubmit={(e) => { e.preventDefault(); run(() => joinRoom(code.trim())); }}>
         <input className="code-input" inputMode="numeric" pattern="[0-9]*" maxLength={4} placeholder="방 코드 4자리" value={code} onChange={(e) => setCode(e.target.value.replace(/\D/g, ''))} />
@@ -339,7 +338,7 @@ function Menu({ onStart, onPvp }) {
         <h3>게임 규칙</h3>
         <p>• 화투 48장 중 같은 월 2장을 뒤집어 맞추면 가져가고 한 번 더 뒤집을 수 있습니다. 틀리거나, 한 턴에 카드 4장(2번 시도)을 모두 열면 맞췄어도 상대 차례입니다.</p>
         <p>• 시작할 때 <b>카드 4장이 앞면으로 깔려</b> 있어, 먼저 하는 쪽이 불리하지 않도록 두 사람이 한 턴씩 보고 시작합니다. 이긴 편이 다음 판의 선이 됩니다. 깔다가 아이템 패가 나오면 효과 없이 선(먼저 하는 사람)이 그냥 먹고, 일반 카드 4장은 항상 깔립니다.</p>
-        <p>• 쉬움 난이도에서는 틀린 카드가 5턴(사람과 AI의 턴을 모두 셉니다) 동안 앞면으로 남아 있고, 앞면인 카드도 다시 골라 짝을 맞출 수 있습니다. 카드 모서리의 숫자는 남은 턴이고, 점선 테두리 카드는 이번 턴이 끝나면 뒷면으로 돌아갑니다.</p>
+        <p>• 틀린 카드는 5턴(사람과 AI의 턴을 모두 셉니다) 동안 앞면으로 남아 있고, 앞면인 카드도 다시 골라 짝을 맞출 수 있습니다. 카드 모서리의 숫자는 남은 턴이고, 점선 테두리 카드는 이번 턴이 끝나면 뒷면으로 돌아갑니다.</p>
         <p>• 판에는 <b>아이템 패 6장</b>(쌍피 2, 쓰리피, 섞기, 초기화, 엿보기)이 섞여 있습니다. 뒤집으면 그 자리에서 효과가 발동하고 시도 횟수는 쓰지 않습니다. 쌍피·쓰리피는 피 2장·3장으로 계산되어 먹은 패에 들어가고, 섞기는 남은 카드의 위치를 모두 바꾸며, 초기화는 열려 있던 카드를 모두 뒷면으로 돌리고, 엿보기는 쓴 사람만 3초 동안 판의 모든 카드를 볼 수 있게 합니다(상대에게는 보이지 않고, 그동안 카드를 누를 수 없습니다).</p>
         <p>• 광 3점(비광 포함 2점)·4광 4점·5광 15점, 고도리 5점, 홍단·청단·초단 각 3점</p>
         <p>• 열끗·띠는 5장부터 1점(이후 1장당 +1), 피는 10장부터 1점(쌍피는 2장으로 계산)</p>
@@ -530,7 +529,7 @@ export default function App() {
             setPvpRoom(null);
             setNotice('상대가 없어 AI와 연습 판으로 시작합니다.');
             setTimeout(() => setNotice(''), 3000);
-            startGame('normal');
+            startGame('easy');
           }}
         />
       ) : (
