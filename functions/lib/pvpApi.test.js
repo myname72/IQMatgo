@@ -12,7 +12,7 @@ vi.mock('firebase-functions/v2/https', () => ({
 const api = await import('../pvpApi.js');
 const { aiChooseFlip, aiDecideGoStop } = await import('../game/engine.js');
 
-const req = (uid, data = {}, verified = true) => ({ auth: { uid, token: { email_verified: verified } }, data });
+const req = (uid, data = {}) => ({ auth: { uid, token: {} }, data });
 const wallet = (uid, points = 100000) => store.set(`users/${uid}`, { points, name: uid });
 const room = (id) => store.get(`rooms/${id}`);
 const viewOf = (id) => JSON.parse(room(id).viewJson);
@@ -62,8 +62,8 @@ describe('사람 대전 API (인메모리 Firestore)', () => {
     await expect(api.quickMatch(req('poor'))).rejects.toMatchObject({ code: 'failed-precondition' });
   });
 
-  it('이메일 인증이 안 된 계정은 거부', async () => {
-    await expect(api.quickMatch(req('alice', {}, false))).rejects.toMatchObject({ code: 'failed-precondition' });
+  it('로그인하지 않으면 거부', async () => {
+    await expect(api.quickMatch({ data: {} })).rejects.toMatchObject({ code: 'unauthenticated' });
   });
 
   it('공개 상태에는 뒤집지 않은 카드의 정체가 없다 (상대가 읽는 문서)', async () => {

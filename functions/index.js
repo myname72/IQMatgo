@@ -10,7 +10,6 @@ const opts = { region: 'asia-northeast3', cors: true };
 
 const need = (req) => {
   if (!req.auth) throw new HttpsError('unauthenticated', '로그인이 필요합니다.');
-  if (req.auth.token.email_verified !== true) throw new HttpsError('failed-precondition', '이메일 인증이 필요합니다.');
   return req.auth.uid;
 };
 

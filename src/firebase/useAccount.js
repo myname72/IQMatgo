@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { firebaseEnabled } from './config.js';
-import { reloadUser, resendVerification, resetPassword, signIn, signInEmail, signOut, signUpEmail, watchUser, watchWallet } from './wallet.js';
+import { resetPassword, signIn, signInEmail, signOut, signUpEmail, watchUser, watchWallet } from './wallet.js';
 
 // Firebase 오류 코드를 사람이 읽을 말로 바꾼다
 const MESSAGES = {
@@ -25,11 +25,11 @@ export function useAccount() {
   useEffect(() => (firebaseEnabled ? watchUser(setUser) : undefined), []);
   useEffect(() => {
     setWallet(null);
-    if (!user || !user.verified) return undefined; // 이메일 인증 전에는 지갑을 만들지 않는다
+    if (!user) return undefined;
     return watchWallet(user, setWallet, () => setError('포인트 정보를 불러오지 못했습니다.'));
   }, [user]);
 
-  const status = !firebaseEnabled ? 'off' : user === undefined ? 'loading' : !user ? 'out' : user.verified ? 'in' : 'unverified';
+  const status = !firebaseEnabled ? 'off' : user === undefined ? 'loading' : user ? 'in' : 'out';
   return {
     status,
     user,
@@ -41,8 +41,6 @@ export function useAccount() {
     signUpEmail: (email, pw, name) => signUpEmail(email, pw, name).then(() => setError('')).catch((e) => { setError(explain(e)); throw e; }),
     signInEmail: (email, pw) => signInEmail(email, pw).then(() => setError('')).catch((e) => { setError(explain(e)); throw e; }),
     resetPassword: (email) => resetPassword(email).catch((e) => { setError(explain(e)); throw e; }),
-    resendVerification: () => resendVerification().catch((e) => setError(explain(e))),
-    reloadUser: () => reloadUser().catch(() => {}),
     signOut: () => signOut().catch(() => {}),
   };
 }

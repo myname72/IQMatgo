@@ -234,7 +234,7 @@ function EmailForm({ acc, onDone }) {
       <input type="email" placeholder="이메일" value={email} onChange={(e) => setEmail(e.target.value)} required autoComplete="email" />
       {mode !== 'reset' && <input type="password" placeholder="비밀번호 (6자 이상)" value={pw} onChange={(e) => setPw(e.target.value)} required minLength={6} autoComplete={mode === 'up' ? 'new-password' : 'current-password'} />}
       <button className="btn btn-normal account-btn" disabled={busy}>
-        {mode === 'in' ? '로그인' : mode === 'up' ? '가입하고 인증 메일 받기' : '재설정 메일 보내기'}
+        {mode === 'in' ? '로그인' : mode === 'up' ? '가입하고 시작하기' : '재설정 메일 보내기'}
       </button>
       {mode === 'in' && <button type="button" className="account-link" onClick={() => { setMode('reset'); acc.setError(''); }}>비밀번호를 잊었어요</button>}
       {mode === 'reset' && <button type="button" className="account-link" onClick={() => { setMode('in'); setInfo(''); }}>로그인으로 돌아가기</button>}
@@ -258,16 +258,6 @@ function AccountBar() {
           </div>
           {open && <EmailForm acc={acc} onDone={() => setOpen(false)} />}
           {!open && <span className="account-note">로그인하면 포인트가 저장됩니다. 로그인 없이도 연습은 가능해요.</span>}
-        </>
-      )}
-      {acc.status === 'unverified' && (
-        <>
-          <span className="account-note">{acc.user.email} 로 인증 메일을 보냈습니다. 메일의 링크를 누른 뒤 아래 버튼을 눌러 주세요.</span>
-          <div className="account-actions">
-            <button className="btn btn-normal account-btn" onClick={acc.reloadUser}>인증했어요</button>
-            <button className="account-link" onClick={acc.resendVerification}>메일 다시 보내기</button>
-            <button className="account-link" onClick={acc.signOut}>로그아웃</button>
-          </div>
         </>
       )}
       {acc.status === 'in' && (
@@ -444,7 +434,7 @@ function Menu({ onStart, onPvp }) {
             <div className="profile-text">
               <b>게스트</b>
               <button className="profile-link" onClick={() => setShowAuth(true)}>
-                {acc.status === 'unverified' ? '이메일 인증 필요' : acc.status === 'loading' ? '확인 중…' : '로그인 / 가입'}
+                {acc.status === 'loading' ? '확인 중…' : '로그인 / 가입'}
               </button>
             </div>
           )}
