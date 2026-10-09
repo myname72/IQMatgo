@@ -61,9 +61,9 @@ function CapturedRow({ groups, className }) {
 }
 
 function CapturedPanel({ who, title, cards, score, goCount, active = false }) {
-  const pick = (kind) => cards.filter((c) => c.kind === kind);
-  // 국진을 쌍피로 쓰는 쪽이 유리하면 피 장수도 그렇게 센다
+  // 국진을 쌍피로 쓰는 쪽이 유리하면 피 줄에 놓고 장수도 그렇게 센다 (열끗 줄에는 빠진다)
   const counted = bestCards(cards);
+  const pick = (kind) => counted.filter((c) => c.kind === kind);
   const pi = counted.filter((c) => c.piValue > 0); // 피, 쌍피, 아이템 쌍피·쓰리피
   const piCount = pi.reduce((sum, c) => sum + c.piValue, 0); // 쌍피는 2장
   const items = scoreItems(cards);
