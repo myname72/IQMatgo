@@ -26,6 +26,8 @@ export function swapSides(view) {
   v.goCount = swapPair(view.goCount);
   v.lastGoScore = swapPair(view.lastGoScore);
   v.bonus = swapPair(view.bonus);
+  v.gukjin = swapPair(view.gukjin);
+  if (view.gukjinAsk) v.gukjinAsk = flip(view.gukjinAsk);
   v.turn = flip(view.turn);
   v.first = flip(view.first);
   if (view.turnEvent) v.turnEvent = { ...view.turnEvent, to: flip(view.turnEvent.to) };

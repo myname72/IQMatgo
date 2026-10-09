@@ -114,6 +114,9 @@ body {
 
 .captured-chips { display: flex; flex: 1 0 100%; order: 3; min-width: 0; flex-wrap: wrap; gap: 4px; }
 .captured-chips:empty { display: none; }
+/* 국진 사용법을 바꾸는 칩 (사람 패널에서만 누를 수 있다) */
+button.chip-toggle { cursor: pointer; font-family: inherit; background: rgba(120,200,255,0.18); color: #cfe9ff; border-color: rgba(120,200,255,0.5); }
+button.chip-toggle:hover { background: rgba(120,200,255,0.3); }
 .chip { flex: none; white-space: nowrap; padding: 1px 8px; border-radius: 999px; font-size: 0.72rem; font-weight: 700; background: rgba(255,215,0,0.16); color: #ffe27a; border: 1px solid rgba(255,215,0,0.35); font-variant-numeric: tabular-nums; }
 
 .over-how { opacity: 0.8; font-size: 0.9rem; }

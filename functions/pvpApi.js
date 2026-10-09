@@ -74,7 +74,7 @@ function commit(tx, ctx, game, now) {
   const patch = {
     viewJson: JSON.stringify(publicView(game.state, layoutSeed)),
     version: FieldValue.increment(1),
-    deadline: deadlineFor(game, now),
+    deadline: game.keepDeadline && room.deadline ? room.deadline : deadlineFor(game, now),
     timeouts: game.timeouts,
     updatedAt: now,
   };

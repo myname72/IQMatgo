@@ -11,7 +11,7 @@ export const DAILY_AI_CAP = 3000; // 하루에 AI 대전으로 받을 수 있는
 export const MIN_PLAY_MS = 20_000; // 이보다 빨리 끝난 판은 인정하지 않는다
 export const MAX_ACTIONS = 4000;
 
-const ALLOWED = new Set(['FLIP', 'RESOLVE', 'GO', 'STOP']);
+const ALLOWED = new Set(['FLIP', 'RESOLVE', 'GO', 'STOP', 'GUKJIN']);
 
 // 서버가 발급한 시드로 판을 처음부터 재생해 결과를 직접 계산한다.
 // 클라이언트가 "이겼다"고 주장하는 값은 쓰지 않는다.
@@ -21,7 +21,11 @@ export function replayGame({ difficulty, seed, first, actions }) {
   for (const a of actions) {
     if (!a || !ALLOWED.has(a.type)) throw new Error('bad-action');
     if (a.type === 'FLIP' && !Number.isInteger(a.index)) throw new Error('bad-action');
-    state = gameReducer(state, a.type === 'FLIP' ? { type: 'FLIP', index: a.index } : { type: a.type });
+    // 국진 사용법 선택은 사람 쪽만 보낼 수 있다 (AI 쪽은 늘 자동)
+    if (a.type === 'GUKJIN' && a.who !== undefined && a.who !== 'player') throw new Error('bad-action');
+    state = gameReducer(state, a.type === 'FLIP' ? { type: 'FLIP', index: a.index }
+      : a.type === 'GUKJIN' ? { type: 'GUKJIN', who: 'player', mode: a.mode }
+        : { type: a.type });
   }
   if (state.phase !== 'over') throw new Error('not-finished');
   return state.result; // { winner: 'player' | 'ai' | null, total, ... }

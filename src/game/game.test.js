@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { seededRng } from './rng.js';
 import { HWATU_CARDS, ITEM_CARDS } from './cards.js';
 import { calculateScore, scoreItems, applyGo, finalPayout } from './scoring.js';
-import { canFlip, peekSubset, PEEK_VIEW_MS, START_OPEN, MEMORY_LIMIT, REVEAL_TURNS, AUTO_STOP_REMAINING, MAX_TRIES, createGame, flipCard, resolveFlip, declareGo, declareStop, aiChooseFlip, scoreOf } from './engine.js';
+import { gameReducer, canFlip, peekSubset, PEEK_VIEW_MS, START_OPEN, MEMORY_LIMIT, REVEAL_TURNS, AUTO_STOP_REMAINING, MAX_TRIES, createGame, flipCard, resolveFlip, declareGo, declareStop, aiChooseFlip, scoreOf } from './engine.js';
 
 const byName = (...names) => names.map((n) => HWATU_CARDS.find((c) => c.name === n));
 const fill = (kind, n) => HWATU_CARDS.filter((c) => c.kind === kind).slice(0, n);
@@ -737,5 +737,40 @@ describe('아이템 패', () => {
     }
     expect(human).toBeGreaterThan(0);
     expect(aiFirst).toBeGreaterThan(0);
+  });
+});
+
+describe('국진 사용법 선택', () => {
+  // 9월 4장을 판 앞쪽에 두고 사람이 국진 짝을 먹게 만든다
+  const riggedNine = () => {
+    const g = cleanGame('normal');
+    const nine = HWATU_CARDS.filter((c) => c.month === 9);
+    const rest = g.deck.filter((s) => s.card.month !== 9 && s.card.kind !== 'item');
+    return { ...g, deck: [...nine.map((card) => ({ card, taken: false })), ...rest] };
+  };
+
+  it('사람이 국진을 먹으면 물어보고, 고른 대로 계산된다', () => {
+    let g = riggedNine();
+    const gukjin = g.deck.findIndex((s) => s.card.name === '국화술잔');
+    const pair = g.deck.findIndex((s, i) => i !== gukjin && s.card.month === 9);
+    g = resolveFlip(flipCard(flipCard(g, gukjin), pair));
+    expect(g.gukjinAsk).toBe('player');
+    expect(g.gukjin.player).toBe('auto');
+
+    // 쌍피로 쓰면 피가 2장 늘어난다
+    const piOf = (st) => st.captured.player.reduce((n, c) => n + (c.kind === 'ssangpi' && c.month === 9 ? 2 : 0), 0);
+    const asPi = gameReducer(g, { type: 'GUKJIN', who: 'player', mode: 'pi' });
+    expect(asPi.gukjinAsk).toBe(null);
+    expect(asPi.gukjin.player).toBe('pi');
+    expect(piOf(asPi)).toBe(0); // 먹은 패 자체는 그대로 두고 계산할 때만 바꾼다
+    expect(scoreItems(asPi.captured.player, 'pi').some((i) => i.label.startsWith('국진 → 쌍피'))).toBe(true);
+    expect(scoreItems(asPi.captured.player, 'animal').some((i) => i.label.startsWith('국진 → 열끗'))).toBe(true);
+  });
+
+  it('AI는 묻지 않고 늘 유리한 쪽으로 쓴다', () => {
+    const g = cleanGame('normal');
+    // 피 9장 + 국진을 AI가 가졌다면 쌍피로 세어 2점
+    const ai = [...fill('pi', 9), ...byName('국화술잔')];
+    expect(scoreOf({ ...g, captured: { ...g.captured, ai } }, 'ai')).toBe(2);
   });
 });

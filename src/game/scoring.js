@@ -6,13 +6,20 @@
 
 export const WIN_THRESHOLD = 7;
 
-// 9월 국진(국화술잔)은 열끗으로도, 쌍피로도 쓸 수 있다. 항상 더 유리한 쪽으로 계산한다.
+// 9월 국진(국화술잔)은 열끗으로도, 쌍피로도 쓸 수 있다.
+// mode: 'auto' 유리한 쪽 자동 / 'animal' 열끗으로 / 'pi' 쌍피로
 export const isGukjin = (c) => c.month === 9 && c.kind === 'animal';
 const gukjinAsPi = (c) => (isGukjin(c) ? { ...c, kind: 'ssangpi', piValue: 2 } : c);
 export const hasGukjin = (cards) => cards.some(isGukjin);
 // [열끗으로 쓴 패, 쌍피로 쓴 패] (국진이 없으면 한 가지뿐)
-const variants = (cards) => (hasGukjin(cards) ? [cards, cards.map(gukjinAsPi)] : [cards]);
+const variants = (cards, mode = 'auto') => {
+  if (!hasGukjin(cards)) return [cards];
+  if (mode === 'pi') return [cards.map(gukjinAsPi)];
+  if (mode === 'animal') return [cards];
+  return [cards, cards.map(gukjinAsPi)];
+};
 const sumPoints = (items) => items.reduce((n, i) => n + i.points, 0);
+export const usedAsPi = (cards) => cards.some((c) => c.month === 9 && c.kind === 'ssangpi');
 
 export function summarize(cards) {
   const gwang = cards.filter((c) => c.kind === 'gwang');
@@ -64,23 +71,22 @@ function scoreItemsOf(cards) {
   return items;
 }
 
-// 국진을 열끗/쌍피 중 점수가 높은 쪽으로 정한 패 목록
-export function bestCards(cards) {
-  return variants(cards).reduce((a, b) => (sumPoints(scoreItemsOf(b)) > sumPoints(scoreItemsOf(a)) ? b : a));
+// 정해진 방식(또는 점수가 높은 쪽)으로 국진을 반영한 패 목록
+export function bestCards(cards, mode = 'auto') {
+  return variants(cards, mode).reduce((a, b) => (sumPoints(scoreItemsOf(b)) > sumPoints(scoreItemsOf(a)) ? b : a));
 }
 
-// 국진을 열끗/쌍피 어느 쪽으로 쓸지 정해서 점수 항목을 돌려준다 (점수가 높은 쪽)
-export function scoreItems(cards) {
-  const best = variants(cards)
-    .map((v) => ({ v, items: scoreItemsOf(v) }))
-    .reduce((a, b) => (sumPoints(b.items) > sumPoints(a.items) ? b : a));
-  if (!hasGukjin(cards)) return best.items;
-  const asPi = best.v !== cards;
-  return [...best.items, { key: 'gukjin', label: `국진 → ${asPi ? '쌍피' : '열끗'}`, points: 0, note: '9월 국진은 열끗·쌍피 중 유리한 쪽으로 계산합니다' }];
+// 점수 항목 목록. 국진을 들고 있으면 어느 쪽으로 셌는지 알려 주는 항목이 끝에 붙는다.
+export function scoreItems(cards, mode = 'auto') {
+  const used = bestCards(cards, mode);
+  const items = scoreItemsOf(used);
+  if (!hasGukjin(cards)) return items;
+  const label = `국진 → ${usedAsPi(used) ? '쌍피' : '열끗'}${mode === 'auto' ? '' : ' (선택)'}`;
+  return [...items, { key: 'gukjin', label, points: 0, note: '9월 국진은 열끗·쌍피 중 하나로 씁니다' }];
 }
 
-export function calculateScore(cards) {
-  return scoreItems(cards).reduce((sum, item) => sum + item.points, 0);
+export function calculateScore(cards, mode = 'auto') {
+  return scoreItems(cards, mode).reduce((sum, item) => sum + item.points, 0);
 }
 
 // 고 보너스: 고를 한 번 부를 때마다 +1점, 3고부터는 고마다 점수가 2배씩
@@ -143,11 +149,10 @@ function payoutOf(winnerCards, loserCards, goCount, bonus, loserGo) {
   };
 }
 
-export function finalPayout(winnerCards, loserCards, goCount, bonus = 0, loserGo = 0) {
-  // 진 쪽도 국진을 유리하게(피박을 피할 수 있으면 쌍피로) 쓰므로 그쪽에 가장 유리한 해석을 먼저 고르고,
-  // 그 다음 이긴 쪽이 자기에게 가장 유리한 해석을 고른다.
-  const best = variants(winnerCards)
-    .map((w) => variants(loserCards)
+export function finalPayout(winnerCards, loserCards, goCount, bonus = 0, loserGo = 0, modes = {}) {
+  // 'auto' 인 쪽은 자기에게 가장 유리한 해석을 고른다 (진 쪽은 피박을 피하는 쪽).
+  const best = variants(winnerCards, modes.winner ?? 'auto')
+    .map((w) => variants(loserCards, modes.loser ?? 'auto')
       .map((l) => payoutOf(w, l, goCount, bonus, loserGo))
       .reduce((a, b) => (b.total < a.total ? b : a)))
     .reduce((a, b) => (b.total > a.total ? b : a));

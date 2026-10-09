@@ -8,7 +8,7 @@ export const RESOLVE_MIN_MS = 900; // 두 장을 뒤집은 뒤 판정까지 최�
 export const HOST_ALIVE_MS = 45_000; // 방장이 이 시간 안에 신호(heartbeat)를 보낸 대기 방만 목록에 보인다
 export const HEARTBEAT_MS = 15_000;
 
-const ACTIONS = new Set(['FLIP', 'RESOLVE', 'GO', 'STOP']);
+const ACTIONS = new Set(['FLIP', 'RESOLVE', 'GO', 'STOP', 'GUKJIN']);
 export const sideOf = (seat) => (seat === 'A' ? 'player' : 'ai');
 export const seatOf = (side) => (side === 'player' ? 'A' : 'B');
 export const otherSeat = (seat) => (seat === 'A' ? 'B' : 'A');
@@ -26,6 +26,12 @@ export function applyAction(game, seat, action, now) {
   if (!action || !ACTIONS.has(action.type)) throw new Error('bad-action');
   if (s.phase === 'over') throw new Error('over');
   const mine = s.turn === sideOf(seat);
+  // 국진을 열끗/쌍피 중 무엇으로 쓸지는 자기 차례가 아니어도 언제든 바꿀 수 있다
+  if (action.type === 'GUKJIN') {
+    const next = gameReducer(s, { type: 'GUKJIN', who: sideOf(seat), mode: action.mode });
+    if (next === s) throw new Error('illegal');
+    return { ...game, state: next, keepDeadline: true }; // 제한 시간은 그대로 둔다 (시간 끌기 방지)
+  }
   if (action.type === 'RESOLVE') {
     if (s.flipped.length !== 2 || now - game.lastFlipAt < RESOLVE_MIN_MS) throw new Error('too-early');
   } else {

@@ -12,7 +12,7 @@ import { createRoom, joinByCode, joinById, listRooms, messageOf, quickMatch } fr
 const AccountContext = createContext(null);
 const OpponentContext = createContext('AI'); // 상대 이름 (사람 대전이면 닉네임)
 import { ITEM_CARDS, ITEM_INFO } from './game/cards.js';
-import { WIN_THRESHOLD, scoreItems, bestCards } from './game/scoring.js';
+import { WIN_THRESHOLD, scoreItems, bestCards, usedAsPi } from './game/scoring.js';
 import {
   gameReducer,
   createGame,
@@ -60,13 +60,14 @@ function CapturedRow({ groups, className }) {
   );
 }
 
-function CapturedPanel({ who, title, cards, score, goCount, active = false }) {
-  // 국진을 쌍피로 쓰는 쪽이 유리하면 피 줄에 놓고 장수도 그렇게 센다 (열끗 줄에는 빠진다)
-  const counted = bestCards(cards);
+function CapturedPanel({ who, title, cards, score, goCount, active = false, gukjin = 'auto', onGukjin = null }) {
+  // 국진을 쌍피로 쓰면 피 줄에 놓고 장수도 그렇게 센다 (열끗 줄에는 빠진다)
+  const counted = bestCards(cards, gukjin);
   const pick = (kind) => counted.filter((c) => c.kind === kind);
   const pi = counted.filter((c) => c.piValue > 0); // 피, 쌍피, 아이템 쌍피·쓰리피
   const piCount = pi.reduce((sum, c) => sum + c.piValue, 0); // 쌍피는 2장
-  const items = scoreItems(cards);
+  const items = scoreItems(cards, gukjin);
+  const asPi = usedAsPi(counted);
   const piItem = items.find((item) => item.key === 'pi');
   return (
     <section className={`captured ${active ? 'active' : ''} captured-${who}`} data-who={who} aria-label={`${title}이(가) 먹은 패`}>
@@ -77,7 +78,19 @@ function CapturedPanel({ who, title, cards, score, goCount, active = false }) {
         </span>
         <div className="captured-chips" aria-label="점수 조합">
           {items.filter((item) => item.key !== 'pi').map((item) => (
-            <span className="chip" key={item.key}>{item.label}{item.points > 0 ? ` +${item.points}` : ''}</span>
+            item.key === 'gukjin' && onGukjin ? (
+              <button
+                type="button"
+                className="chip chip-toggle"
+                key="gukjin"
+                onClick={() => onGukjin(asPi ? 'animal' : 'pi')}
+                title="눌러서 국진을 열끗·쌍피 중 바꿉니다"
+              >
+                {item.label} ⇄
+              </button>
+            ) : (
+              <span className="chip" key={item.key}>{item.label}{item.points > 0 ? ` +${item.points}` : ''}</span>
+            )
           ))}
         </div>
         <span className="captured-score">{score}점{goCount > 0 && ` · ${goCount}고`}</span>
@@ -390,7 +403,7 @@ function RulesModal({ onClose }) {
         <p>• 판에는 <b>아이템 패 6장</b>(쌍피 2, 쓰리피, 섞기, 초기화, 엿보기)이 섞여 있습니다. 뒤집으면 그 자리에서 효과가 발동하고 시도 횟수는 쓰지 않습니다. 쌍피·쓰리피는 피 2장·3장으로 계산되어 먹은 패에 들어가고, 섞기는 남은 카드의 위치를 모두 바꾸며, 초기화는 열려 있던 카드를 모두 뒷면으로 돌리고, 엿보기는 쓴 사람만 3초 동안 닫혀 있는 카드의 절반(무작위, 아이템 패는 제외)을 볼 수 있게 합니다(상대에게는 보이지 않고, 그동안 카드를 누를 수 없습니다).</p>
         <p>• 광 3점(비광 포함 2점)·4광 4점·5광 15점, 고도리 5점, 홍단·청단·초단 각 3점</p>
         <p>• 열끗·띠는 5장부터 1점(이후 1장당 +1), 피는 10장부터 1점(쌍피는 2장으로 계산)</p>
-        <p>• <b>9월 국진</b>은 열끗으로도, 쌍피(피 2장)로도 쓸 수 있어 <b>점수가 높아지는 쪽으로 자동 계산</b>됩니다.</p>
+        <p>• <b>9월 국진</b>은 열끗으로도, 쌍피(피 2장)로도 쓸 수 있습니다. 먹으면 어느 쪽으로 쓸지 물어보고, 먹은 패의 <b>국진 칩을 눌러 언제든 바꿀 수</b> 있습니다. &lsquo;알아서 유리하게&rsquo;를 고르면 점수가 높은 쪽으로 자동 계산되고, AI는 늘 유리한 쪽으로 씁니다.</p>
         <p>• <b>보너스</b>(상대 피를 가져옴): <b>판쓸</b> 열려 있던 카드를 모두 먹음(+1점도) · <b>쪽</b> 앞면으로 열려 있지 않던 두 장을 뒤집어 바로 짝(첫 번째·두 번째 시도 모두) · <b>폭탄</b> 한 턴에 같은 월 4장을 모두 먹었을 때(같은 월 짝을 연속으로 두 번, 피 2장)</p>
         <p>• {WIN_THRESHOLD}점 이상이 되면 <b>턴이 끝날 때</b>(남은 2번의 시도를 모두 마친 뒤) <b>고</b>(계속) 또는 <b>스톱</b>(종료)을 선택합니다. 고를 부르면 <b>상대 차례로 넘어가고</b>, 그 뒤에는 점수가 더 올라야 다시 선택할 수 있습니다.</p>
         <p>• <b>고 점수</b>: 고를 부를 때마다 +1점이 붙고, 3고부터는 고마다 점수가 2배씩 커집니다(3고 ×2, 4고 ×4, 5고 ×8). 예) 21점에서 4고 → (21+4)×4 = 100점</p>
@@ -552,11 +565,14 @@ function appReducer(state, action) {
   if (state === null) return state;
   const next = gameReducer(state, action);
   if (state.gameId && next !== state && LOGGED.has(action.type)) {
-    return { ...next, log: [...state.log, action.type === 'FLIP' ? { type: 'FLIP', index: action.index } : { type: action.type }] };
+    const entry = action.type === 'FLIP' ? { type: 'FLIP', index: action.index }
+      : action.type === 'GUKJIN' ? { type: 'GUKJIN', who: action.who ?? 'player', mode: action.mode }
+        : { type: action.type };
+    return { ...next, log: [...state.log, entry] };
   }
   return next;
 }
-const LOGGED = new Set(['FLIP', 'RESOLVE', 'GO', 'STOP']);
+const LOGGED = new Set(['FLIP', 'RESOLVE', 'GO', 'STOP', 'GUKJIN']);
 
 // 이긴 편이 다음 판의 선이 된다 (비기면 이전 선 유지)
 const nextFirst = (state) => (state?.phase === 'over' ? (state.result?.winner ?? state.first ?? 'player') : 'player');
@@ -807,8 +823,8 @@ function Game({ state, send, onStart, settle, remote, remoteEnter }) {
           </p>
         )}
 
-        <CapturedPanel who="ai" title={opp} cards={state.captured.ai} score={aiScore} goCount={state.goCount.ai} />
-        <CapturedPanel who="player" title={myName} cards={state.captured.player} score={playerScore} goCount={state.goCount.player} />
+        <CapturedPanel who="ai" title={opp} cards={state.captured.ai} score={aiScore} goCount={state.goCount.ai} gukjin={state.gukjin?.ai} />
+        <CapturedPanel who="player" title={myName} cards={state.captured.player} score={playerScore} goCount={state.goCount.player} gukjin={state.gukjin?.player} />
 
         {r.winner && (
           <section className="payout" aria-label="득점 내역">
@@ -897,7 +913,7 @@ function Game({ state, send, onStart, settle, remote, remoteEnter }) {
       )}
       {state.turnEvent && turnToastN === state.turnEvent.n && <TurnBanner event={state.turnEvent} />}
 
-      <CapturedPanel who="ai" title={opp} cards={state.captured.ai} score={aiScore} goCount={state.goCount.ai} active={state.turn === 'ai'} />
+      <CapturedPanel who="ai" title={opp} cards={state.captured.ai} score={aiScore} goCount={state.goCount.ai} active={state.turn === 'ai'} gukjin={state.gukjin?.ai} />
 
       {state.itemEvent && toastN === state.itemEvent.n && <ItemToast event={state.itemEvent} />}
       {state.rewardEvent && rewardToastN === state.rewardEvent.n && <RewardBurst event={state.rewardEvent} />}
@@ -962,7 +978,30 @@ function Game({ state, send, onStart, settle, remote, remoteEnter }) {
       </div>
       </div>
 
-      <CapturedPanel who="player" title={myName} cards={state.captured.player} score={playerScore} goCount={state.goCount.player} active={state.turn === 'player'} />
+      <CapturedPanel
+        who="player"
+        title={myName}
+        cards={state.captured.player}
+        score={playerScore}
+        goCount={state.goCount.player}
+        active={state.turn === 'player'}
+        gukjin={state.gukjin?.player}
+        onGukjin={(mode) => send({ type: 'GUKJIN', who: 'player', mode })}
+      />
+
+      {state.gukjinAsk === 'player' && state.phase !== 'over' && (
+        <div className="gostop-overlay" role="dialog" aria-label="국진 사용법">
+          <div className="gostop-box">
+            <h3>국진을 어떻게 쓸까요?</h3>
+            <p>9월 국진은 <b>열끗</b>으로도, <b>쌍피(피 2장)</b>로도 쓸 수 있습니다. 먹은 패의 국진 표시를 눌러 언제든 바꿀 수 있습니다.</p>
+            <div className="row">
+              <button className="btn btn-easy" onClick={() => send({ type: 'GUKJIN', who: 'player', mode: 'animal' })}>열끗으로</button>
+              <button className="btn btn-easy" onClick={() => send({ type: 'GUKJIN', who: 'player', mode: 'pi' })}>쌍피로</button>
+              <button className="btn go-button" onClick={() => send({ type: 'GUKJIN', who: 'player', mode: 'auto' })}>알아서 유리하게</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {state.phase === 'gostop' && state.turn === 'player' && (
         <div className="gostop-overlay" role="dialog" aria-label="고 또는 스톱">

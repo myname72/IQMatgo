@@ -18,6 +18,7 @@ export const MAX_TRIES = MAX_FLIPS / 2;
 export const PEEK_VIEW_MS = 3000;
 
 const other = (who) => (who === 'player' ? 'ai' : 'player');
+const isGukjinCard = (c) => c.month === 9 && c.kind === 'animal';
 
 // 시작할 때 판에 앞면으로 깔아 두는 카드 수 (먼저 시작하는 쪽이 불리하지 않도록 둘 다 본다)
 export const START_OPEN = 4;
@@ -66,6 +67,8 @@ export function createGame(difficulty, rng = Math.random, first = 'player') {
     pendingTurnEnd: null,
     rewardEvent: null,
     bonus: { player: 0, ai: 0 },
+    gukjin: { player: 'auto', ai: 'auto' }, // 9월 국진을 열끗/쌍피 중 무엇으로 쓸지 ('auto'는 유리한 쪽)
+    gukjinAsk: null, // 국진을 막 먹어서 물어봐야 하는 쪽 ('player' | 'ai')
     turnMonths: [], // 이번 턴에 짝을 맞춰 먹은 월들 (폭탄 판정용, 턴이 넘어가면 비운다)
     message: first === 'player' ? `카드 ${START_OPEN}장이 앞면으로 깔려 있습니다. 당신의 턴입니다!` : `카드 ${START_OPEN}장이 앞면으로 깔려 있습니다. AI가 먼저 시작합니다.`,
     result: null,
@@ -78,7 +81,7 @@ export function createGame(difficulty, rng = Math.random, first = 'player') {
   return state;
 }
 
-export const scoreOf = (state, who) => calculateScore(state.captured[who]) + (state.bonus?.[who] ?? 0);
+export const scoreOf = (state, who) => calculateScore(state.captured[who], state.gukjin?.[who] ?? 'auto') + (state.bonus?.[who] ?? 0);
 
 const whoLabel = (who) => (who === 'player' ? '당신' : 'AI');
 
@@ -248,6 +251,7 @@ function finish(state, winner, how) {
     state.goCount[winner],
     state.bonus?.[winner] ?? 0,
     state.goCount[other(winner)], // 고박: 진 쪽이 고를 불렀으면 점수 2배
+    { winner: state.gukjin?.[winner] ?? 'auto', loser: state.gukjin?.[other(winner)] ?? 'auto' },
   );
   return {
     ...state,
@@ -308,6 +312,8 @@ export function resolveFlip(state) {
     captured: { ...state.captured, [who]: [...state.captured[who], a, b] },
   };
   next.message = `🎯 ${whoLabel(who)}이(가) ${a.month}월 짝을 맞췄습니다!`;
+  // 국진을 먹었으면 어떻게 쓸지 물어본다 (AI는 묻지 않고 늘 유리한 쪽)
+  if (a.month === 9 && [a, b].some(isGukjinCard)) next.gukjinAsk = who;
 
   if (remainingNormal(next) === 0) return settleEnd(next);
 
@@ -457,8 +463,16 @@ export function declareStop(state) {
   return finish(state, state.turn, 'stop');
 }
 
+// 국진 사용법 선택: 'auto' | 'animal' | 'pi'. 되돌리거나 바꾸는 것도 언제든 가능하다.
+export function setGukjin(state, who, mode) {
+  if (!['auto', 'animal', 'pi'].includes(mode)) return state;
+  return { ...state, gukjin: { ...state.gukjin, [who]: mode }, gukjinAsk: state.gukjinAsk === who ? null : state.gukjinAsk };
+}
+
 export function gameReducer(state, action) {
   switch (action.type) {
+    case 'GUKJIN':
+      return setGukjin(state, action.who ?? 'player', action.mode);
     case 'START':
       return createGame(action.difficulty, action.rng, action.first);
     case 'FLIP':
