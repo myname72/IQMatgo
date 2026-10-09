@@ -48,6 +48,24 @@ describe('점수 계산', () => {
     // 쌍피는 피 2장
     expect(calculateScore([...fill('pi', 8), ...fill('ssangpi', 1)])).toBe(1);
   });
+  it('국진은 열끗·쌍피 중 유리한 쪽으로 계산된다', () => {
+    // 피 9장 + 국진 → 쌍피로 세어 피 11장(2점)
+    const asPi = [...fill('pi', 9), ...byName('국화술잔')];
+    expect(calculateScore(asPi)).toBe(2);
+    expect(scoreItems(asPi).find((i) => i.key === 'gukjin').label).toBe('국진 → 쌍피');
+    // 열끗 4장 + 국진 → 열끗 5장(1점)이 더 유리
+    const asAnimal = byName('매조', '난초열끗', '모란나비', '홍싸리멧돼지', '국화술잔');
+    expect(calculateScore(asAnimal)).toBe(1);
+    expect(scoreItems(asAnimal).find((i) => i.key === 'gukjin').label).toBe('국진 → 열끗');
+    // 국진이 없으면 안내 항목도 없다
+    expect(scoreItems(fill('pi', 10)).some((i) => i.key === 'gukjin')).toBe(false);
+  });
+  it('진 쪽의 국진도 피박을 피하는 데 쓰인다', () => {
+    const winner = [...fill('pi', 10), ...byName('송학광', '벚꽃광', '공산광')];
+    // 피 7장이면 피박이지만, 국진을 쌍피로 치면 8장이 되어 피박을 면한다
+    expect(finalPayout(winner, fill('pi', 7), 0).pibak).toBe(true);
+    expect(finalPayout(winner, [...fill('pi', 6), ...byName('국화술잔')], 0).pibak).toBe(false);
+  });
   it('고/박 배수', () => {
     // 고 1번마다 +1점, 3고부터 고마다 2배씩: (점수 + 고 횟수) × 배수
     expect(applyGo(7, 0)).toBe(7);

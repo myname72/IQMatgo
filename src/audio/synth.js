@@ -220,42 +220,85 @@ export const SFX = {
 };
 
 // ---- 배경 음악 ----
-// 계면조 5음계(도 미♭ 파 솔 시♭)로 만든 느린 12/8 굿거리 장단의 자동 생성 선율.
-const SCALE = [48, 51, 53, 55, 58, 60, 63, 65, 67, 70, 72]; // 낮은 도 ~ 높은 도
-const PULSE = 0.3; // 한 박(8분음표) 길이(초)
-const BAR = PULSE * 12;
-const TEMPLATES = [
-  [0, 3, 6, 8, 9],
-  [0, 2, 3, 6, 9, 10],
-  [0, 3, 4, 6, 9],
-  [0, 4, 6, 7, 9, 11],
-  [0, 3, 6, 9],
+// 느긋한 라운지 재즈 풍 자동 생성 루프: 전자피아노 코드 + 워킹 베이스 + 브러시 드럼.
+const BEAT = 0.68; // 한 박(≈88 BPM)
+const BAR = BEAT * 4;
+const SWING = BEAT * 0.07; // 뒷박을 살짝 늦춰 스윙 느낌을 준다
+
+// 네 마디 순환 코드 진행 (Am7 - Dm7 - G7 - Cmaj7): 베이스 음과 구성음(MIDI)
+const PROGRESSION = [
+  { bass: 45, notes: [60, 64, 67, 71] }, // Am7
+  { bass: 50, notes: [60, 65, 69, 72] }, // Dm7
+  { bass: 43, notes: [59, 62, 65, 69] }, // G9
+  { bass: 48, notes: [59, 64, 67, 71] }, // Cmaj7
+];
+// 코드마다 선율에 쓸 음 (코드음 + 지나가는 음)
+const MELODY = [
+  [69, 72, 76, 79, 81],
+  [69, 72, 77, 81, 84],
+  [67, 71, 74, 77, 79],
+  [67, 71, 76, 79, 83],
 ];
 
+// 전자피아노: 부드럽게 올라왔다 길게 사라지는 사인음 두 겹
+function epiano(ctx, out, t, { freq, dur = 1.6, vol = 0.07 }) {
+  const lp = ctx.createBiquadFilter();
+  lp.type = 'lowpass';
+  lp.frequency.value = 2600;
+  lp.connect(out);
+  tone(ctx, lp, t, { freq, type: 'sine', dur, vol, attack: 0.035 });
+  tone(ctx, lp, t, { freq: freq * 2.01, type: 'sine', dur: dur * 0.45, vol: vol * 0.3, attack: 0.02 });
+}
+
+// 손가락으로 뜯는 더블베이스
+function upright(ctx, out, t, { freq, dur = 0.55, vol = 0.22 }) {
+  const lp = ctx.createBiquadFilter();
+  lp.type = 'lowpass';
+  lp.frequency.value = 700;
+  lp.connect(out);
+  tone(ctx, lp, t, { freq, type: 'triangle', dur, vol, attack: 0.012, slideTo: freq * 0.99 });
+  noise(ctx, lp, t, { dur: 0.03, vol: vol * 0.25, freq: 900, q: 0.8 });
+}
+
+// 브러시로 쓸어 주는 스네어·라이드
+function brush(ctx, out, t, { vol = 0.05, swish = true }) {
+  noise(ctx, out, t, swish
+    ? { dur: 0.22, vol, type: 'highpass', freq: 4200, q: 0.6, attack: 0.05 }
+    : { dur: 0.07, vol: vol * 1.2, type: 'bandpass', freq: 6500, q: 1.2 });
+}
+
 export function createMusic(ctx, out, rand = Math.random) {
-  let idx = 5;
   let bar = 0;
+  let last = 2; // 직전에 쓴 선율 음 번호
   const scheduleBar = (t0) => {
-    // 장구: 덩(강) - 덕 - 쿵 - 덕 - 덕
-    drum(ctx, out, t0, { low: true, vol: 0.2 });
-    drum(ctx, out, t0 + PULSE * 3, { low: false, vol: 0.12 });
-    drum(ctx, out, t0 + PULSE * 6, { low: true, vol: 0.12 });
-    drum(ctx, out, t0 + PULSE * 9, { low: false, vol: 0.1 });
-    drum(ctx, out, t0 + PULSE * 10, { low: false, vol: 0.08 });
-    // 낮은 음 받침 (두 마디에 한 번)
-    if (bar % 2 === 0) {
-      tone(ctx, out, t0, { freq: midi(36), type: 'sine', dur: BAR * 1.6, vol: 0.1, attack: 0.5 });
-      tone(ctx, out, t0, { freq: midi(43), type: 'sine', dur: BAR * 1.6, vol: 0.06, attack: 0.7 });
+    const step = bar % PROGRESSION.length;
+    const chord = PROGRESSION[step];
+    const scale = MELODY[step];
+
+    // 베이스: 1·3박은 근음, 2·4박은 코드음 사이를 걸어 다닌다
+    upright(ctx, out, t0, { freq: midi(chord.bass) });
+    upright(ctx, out, t0 + BEAT, { freq: midi(chord.bass + 7), vol: 0.14 });
+    upright(ctx, out, t0 + BEAT * 2, { freq: midi(chord.bass + 12), vol: 0.17 });
+    upright(ctx, out, t0 + BEAT * 3 + SWING, { freq: midi(chord.bass + (rand() < 0.5 ? 10 : 5)), vol: 0.13 });
+
+    // 브러시: 박마다 쓸고, 뒷박에 가볍게 찍는다
+    for (let b = 0; b < 4; b++) {
+      brush(ctx, out, t0 + b * BEAT, { vol: b % 2 === 0 ? 0.05 : 0.035 });
+      if (b % 2 === 1) brush(ctx, out, t0 + b * BEAT + BEAT / 2 + SWING, { vol: 0.03, swish: false });
     }
-    // 선율: 한 칸씩 걷듯이 움직이고 마디 끝에서는 중심음으로 돌아온다
-    const onsets = TEMPLATES[Math.floor(rand() * TEMPLATES.length)];
-    onsets.forEach((p, i) => {
-      const last = i === onsets.length - 1;
-      const step = last ? (idx > 5 ? -1 : 1) * (1 + Math.floor(rand() * 2)) : Math.floor(rand() * 5) - 2;
-      idx = Math.max(0, Math.min(SCALE.length - 1, idx + step));
-      if (bar % 4 === 3 && last) idx = 5; // 네 마디마다 중심음에서 마무리
-      pluck(ctx, out, t0 + p * PULSE, { freq: midi(SCALE[idx] + 12), dur: 1.6, vol: 0.13 });
+
+    // 코드: 2박과 4박 뒤에 살짝 늦게 깔아 준다 (엇박 컴핑)
+    const comp = (t, spread) => chord.notes.forEach((n, k) => epiano(ctx, out, t + k * 0.012, { freq: midi(n), dur: spread, vol: 0.055 }));
+    comp(t0 + BEAT * 0.5 + SWING, 1.5);
+    if (rand() < 0.7) comp(t0 + BEAT * 2.5 + SWING, 1.2);
+
+    // 선율: 한두 음씩 띄엄띄엄, 가까운 음으로 움직인다
+    const hits = rand() < 0.35 ? [1.5, 3] : [2.5];
+    hits.forEach((b) => {
+      last = Math.max(0, Math.min(scale.length - 1, last + Math.floor(rand() * 3) - 1));
+      epiano(ctx, out, t0 + b * BEAT + SWING, { freq: midi(scale[last]), dur: 1.3, vol: 0.085 });
     });
+
     bar++;
   };
   return { scheduleBar, BAR };
