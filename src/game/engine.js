@@ -323,9 +323,12 @@ export function resolveFlip(state) {
 
   if (remainingNormal(next) === 0) return settleEnd(next);
 
-  // 보너스: 판쓸·쪽·폭탄은 상대의 피를 가져온다 (판쓸은 +1점도 더한다)
+  // 보너스: 판쓸·쪽·폭탄은 상대의 피를 가져온다 (점수가 더해지지는 않는다)
   const rewards = [];
-  if (state.revealed.length > 0 && next.revealed.length === 0) rewards.push({ kind: 'sweep', label: '판쓸', pi: 1, bonus: 1 });
+  // 판쓸: 열려 있던 카드를 모두 먹었을 때. 다만 막판(남은 카드가 적을 때)에는 판이 저절로 비므로 인정하지 않는다.
+  if (state.revealed.length > 0 && next.revealed.length === 0 && remainingNormal(next) > AUTO_STOP_REMAINING) {
+    rewards.push({ kind: 'sweep', label: '판쓸', pi: 1 });
+  }
   if (!state.revealed.includes(i) && !state.revealed.includes(j)) rewards.push({ kind: 'jjok', label: '쪽', pi: 1 });
   // 폭탄: 한 턴에 같은 월 4장을 모두 먹었을 때 (같은 월 짝을 이번 턴에 두 번 맞춤)
   next.turnMonths = [...(state.turnMonths ?? []), a.month];

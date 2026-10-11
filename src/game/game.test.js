@@ -590,7 +590,7 @@ describe('아이템 패', () => {
 
   const pairOf = (g, m) => g.deck.map((s, k) => (!s.taken && s.card.month === m ? k : -1)).filter((k) => k >= 0).slice(0, 2);
 
-  it('판쓸: 열려 있던 카드를 모두 먹으면 상대 피 한 장과 +1점', () => {
+  it('판쓸: 열려 있던 카드를 모두 먹으면 상대 피 한 장 (점수는 없다)', () => {
     let g = cleanGame('easy');
     const ms = pairOf(g, 1);
     g.revealed = [...ms];
@@ -599,7 +599,7 @@ describe('아이템 패', () => {
     g = resolveFlip(flipCard(flipCard(g, ms[0]), ms[1]));
     expect(g.rewardEvent.rewards.map((r) => r.kind)).toContain('sweep');
     expect(g.captured.ai).toHaveLength(3 - g.rewardEvent.stolen.length);
-    expect(g.bonus.player).toBe(1);
+    expect(g.bonus.player).toBe(0); // 판쓸은 피만 가져오고 점수는 더하지 않는다
     // 열린 카드가 남아 있으면 판쓸이 아니다
     let h = cleanGame('easy');
     const m2 = pairOf(h, 1);
@@ -608,7 +608,19 @@ describe('아이템 패', () => {
     h.revealLeft = { [m2[0]]: 3, [m2[1]]: 3, [other]: 3 };
     h.tries = 1;
     h = resolveFlip(flipCard(flipCard(h, m2[0]), m2[1]));
-    expect(h.bonus.player).toBe(0);
+    expect((h.rewardEvent?.rewards ?? []).map((r) => r.kind)).not.toContain('sweep');
+
+    // 막판(남은 카드가 AUTO_STOP_REMAINING 이하)에는 판쓸이 되지 않는다
+    let k = cleanGame('easy');
+    const m3 = pairOf(k, 1);
+    // 1월 두 장과 다른 네 장만 남기고 나머지는 모두 먹은 것으로 둔다
+    const keep = new Set([...m3, ...k.deck.map((s2, i) => (!m3.includes(i) && s2.card.kind !== 'item' ? i : -1)).filter((i) => i >= 0).slice(0, 4)]);
+    k.deck = k.deck.map((s2, i) => (keep.has(i) || s2.card.kind === 'item' ? s2 : { ...s2, taken: true }));
+    k.revealed = [...m3];
+    k.revealLeft = { [m3[0]]: 3, [m3[1]]: 3 };
+    k.captured.ai = fill('pi', 3);
+    k = resolveFlip(flipCard(flipCard(k, m3[0]), m3[1]));
+    expect((k.rewardEvent?.rewards ?? []).map((r) => r.kind)).not.toContain('sweep');
   });
 
   it('쪽: 첫 시도에서 처음 보는 두 장이 짝이면 상대 피 한 장', () => {
