@@ -14,7 +14,8 @@ function playLogged(difficulty, seed, first) {
   };
   let guard = 0;
   while (g.phase !== 'over' && guard++ < 5000) {
-    if (g.phase === 'gostop') act({ type: aiDecideGoStop(g) === 'go' ? 'GO' : 'STOP' });
+    if (g.gukjinAsk) act({ type: 'GUKJIN', who: g.gukjinAsk, mode: 'auto' }); // 사람 쪽 국진 선택
+    else if (g.phase === 'gostop') act({ type: aiDecideGoStop(g) === 'go' ? 'GO' : 'STOP' });
     else if (g.flipped.length === 2) act({ type: 'RESOLVE' });
     else act({ type: 'FLIP', index: aiChooseFlip(g) });
   }

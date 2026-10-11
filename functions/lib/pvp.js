@@ -15,7 +15,7 @@ export const otherSeat = (seat) => (seat === 'A' ? 'B' : 'A');
 
 // 새 판 (A 자리가 engine 의 player, B 자리가 ai 쪽). first 는 선을 잡는 자리.
 export function newGame({ difficulty, firstSeat = 'A', rng }) {
-  return { state: createGame(difficulty, rng, sideOf(firstSeat)), lastFlipAt: 0, timeouts: { A: 0, B: 0 } };
+  return { state: createGame(difficulty, rng, sideOf(firstSeat), false), lastFlipAt: 0, timeouts: { A: 0, B: 0 } };
 }
 
 export const deadlineFor = (game, now, first = false) => (game.state.phase === 'over' ? null : now + (first ? FIRST_MOVE_MS : MOVE_MS));
@@ -53,6 +53,7 @@ export function applyTimeout(game) {
   let s = game.state;
   if (s.phase === 'over') throw new Error('over');
   const seat = seatOf(s.turn);
+  if (s.gukjinAsk) s = gameReducer(s, { type: 'GUKJIN', who: s.gukjinAsk, mode: 'auto' }); // 못 고르면 유리한 쪽으로
   if (s.phase === 'playing' && s.flipped.length === 2) s = resolveFlip(s);
   if (s.phase === 'gostop') s = gameReducer(s, { type: 'STOP' }); // 고/스톱을 못 정하면 스톱
   else if (s.phase === 'playing') s = skipTurn(s);

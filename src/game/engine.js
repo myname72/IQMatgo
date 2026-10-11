@@ -23,7 +23,8 @@ const isGukjinCard = (c) => c.month === 9 && c.kind === 'animal';
 // 시작할 때 판에 앞면으로 깔아 두는 카드 수 (먼저 시작하는 쪽이 불리하지 않도록 둘 다 본다)
 export const START_OPEN = 4;
 
-export function createGame(difficulty, rng = Math.random, first = 'player') {
+// vsBot: 'ai' 자리를 컴퓨터가 두는 판(AI 대전)인지. 사람 대전에서는 false.
+export function createGame(difficulty, rng = Math.random, first = 'player', vsBot = true) {
   const dealt = shuffle([...HWATU_CARDS, ...ITEM_CARDS], rng).map((card) => ({ card, taken: false }));
   // 무작위 위치를 하나씩 넘기며 일반 카드 4장이 깔릴 때까지 진행하고, 그 사이에 나온 아이템 패는 효과 없이 선(사람)이 먹는다
   // (쌍피·쓰리피는 피로 계산)
@@ -69,6 +70,8 @@ export function createGame(difficulty, rng = Math.random, first = 'player') {
     bonus: { player: 0, ai: 0 },
     gukjin: { player: 'auto', ai: 'auto' }, // 9월 국진을 열끗/쌍피 중 무엇으로 쓸지 ('auto'는 유리한 쪽)
     gukjinAsk: null, // 국진을 막 먹어서 물어봐야 하는 쪽 ('player' | 'ai')
+    pendingGukjin: null, // 국진 선택을 기다리느라 미뤄 둔 다음 단계 (턴 마무리 또는 판 정산)
+    bots: { player: false, ai: vsBot }, // 컴퓨터가 두는 자리는 묻지 않고 늘 유리한 쪽으로 쓴다
     turnMonths: [], // 이번 턴에 짝을 맞춰 먹은 월들 (폭탄 판정용, 턴이 넘어가면 비운다)
     message: first === 'player' ? `카드 ${START_OPEN}장이 앞면으로 깔려 있습니다. 당신의 턴입니다!` : `카드 ${START_OPEN}장이 앞면으로 깔려 있습니다. AI가 먼저 시작합니다.`,
     result: null,
@@ -210,6 +213,7 @@ function useItem(state, index) {
 export function canFlip(state, index) {
   const slot = state.deck[index];
   if (state.phase !== 'playing' || !slot || slot.taken) return false;
+  if (state.gukjinAsk) return false; // 국진을 어떻게 쓸지 정할 때까지 멈춘다
   if (state.flipped.length >= 2 || state.flipped.includes(index)) return false;
   if (isItem(slot.card)) return true; // 아이템 패는 언제든 뒤집을 수 있다
 
@@ -265,6 +269,8 @@ function finish(state, winner, how) {
 }
 
 function settleEnd(state) {
+  // 국진을 어떻게 쓸지 정하기 전에는 점수를 따지지 않는다
+  if (state.gukjinAsk) return { ...state, pendingGukjin: { kind: 'end' } };
   const p = scoreOf(state, 'player');
   const a = scoreOf(state, 'ai');
   const pOk = p >= WIN_THRESHOLD;
@@ -312,8 +318,8 @@ export function resolveFlip(state) {
     captured: { ...state.captured, [who]: [...state.captured[who], a, b] },
   };
   next.message = `🎯 ${whoLabel(who)}이(가) ${a.month}월 짝을 맞췄습니다!`;
-  // 국진을 먹었으면 어떻게 쓸지 물어본다 (AI는 묻지 않고 늘 유리한 쪽)
-  if (a.month === 9 && [a, b].some(isGukjinCard)) next.gukjinAsk = who;
+  // 국진을 먹었으면 사람에게는 어떻게 쓸지 물어본다 (컴퓨터는 묻지 않고 늘 유리한 쪽)
+  if ([a, b].some(isGukjinCard) && !state.bots?.[who]) next.gukjinAsk = who;
 
   if (remainingNormal(next) === 0) return settleEnd(next);
 
@@ -361,6 +367,8 @@ function applyRewards(state, who, rewards) {
 
 // 턴이 끝나는 시점에 고/스톱 조건을 확인한다. 남은 카드가 적으면 묻지 않고 스톱한다.
 function finishTurn(state, who, reason) {
+  // 국진 선택이 점수를 바꾸므로, 먼저 정한 뒤에 고/스톱을 묻는다
+  if (state.gukjinAsk) return { ...state, pendingGukjin: { kind: 'turn', who, reason } };
   const score = scoreOf(state, who);
   const needed = Math.max(WIN_THRESHOLD, state.lastGoScore[who] + 1);
   if (score >= needed) {
@@ -466,7 +474,13 @@ export function declareStop(state) {
 // 국진 사용법 선택: 'auto' | 'animal' | 'pi'. 되돌리거나 바꾸는 것도 언제든 가능하다.
 export function setGukjin(state, who, mode) {
   if (!['auto', 'animal', 'pi'].includes(mode)) return state;
-  return { ...state, gukjin: { ...state.gukjin, [who]: mode }, gukjinAsk: state.gukjinAsk === who ? null : state.gukjinAsk };
+  const asked = state.gukjinAsk === who;
+  const next = { ...state, gukjin: { ...state.gukjin, [who]: mode }, gukjinAsk: asked ? null : state.gukjinAsk };
+  if (!asked || !next.pendingGukjin) return next;
+  // 선택을 기다리느라 멈춰 둔 단계를 이어서 진행한다
+  const p = next.pendingGukjin;
+  next.pendingGukjin = null;
+  return p.kind === 'end' ? settleEnd(next) : finishTurn(next, p.who, p.reason);
 }
 
 export function gameReducer(state, action) {
@@ -474,7 +488,7 @@ export function gameReducer(state, action) {
     case 'GUKJIN':
       return setGukjin(state, action.who ?? 'player', action.mode);
     case 'START':
-      return createGame(action.difficulty, action.rng, action.first);
+      return createGame(action.difficulty, action.rng, action.first, action.vsBot);
     case 'FLIP':
       return flipCard(state, action.index);
     case 'RESOLVE':

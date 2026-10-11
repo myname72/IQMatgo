@@ -96,9 +96,13 @@ describe('사람 대전 API (인메모리 Firestore)', () => {
     while (room(id).status === 'playing' && guard++ < 6000) {
       vi.setSystemTime(t0 + guard * 1500);
       const s = gameOf(id);
-      const uid = s.turn === 'player' ? 'alice' : 'bob';
+      const uid = (side) => (side === 'player' ? 'alice' : 'bob');
+      if (s.gukjinAsk) {
+        await api.playAction(req(uid(s.gukjinAsk), { roomId: id, action: { type: 'GUKJIN', mode: 'auto' } }));
+        continue;
+      }
       const action = s.phase === 'gostop' ? { type: aiDecideGoStop(s) === 'go' ? 'GO' : 'STOP' } : s.flipped.length === 2 ? { type: 'RESOLVE' } : { type: 'FLIP', index: aiChooseFlip(s) };
-      await api.playAction(req(uid, { roomId: id, action }));
+      await api.playAction(req(uid(s.turn), { roomId: id, action }));
     }
     vi.useRealTimers();
     expect(room(id).status).toBe('over');

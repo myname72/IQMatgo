@@ -767,6 +767,21 @@ describe('국진 사용법 선택', () => {
     expect(scoreItems(asPi.captured.player, 'animal').some((i) => i.label.startsWith('국진 → 열끗'))).toBe(true);
   });
 
+  it('선택하기 전에는 고/스톱도 정산도 하지 않는다', () => {
+    const base = riggedNine();
+    let g = { ...base, tries: MAX_TRIES - 1 }; // 이번 짝으로 턴이 끝나는 상황
+    const gukjin = g.deck.findIndex((s) => s.card.name === '국화술잔');
+    const pair = g.deck.findIndex((s, i) => i !== gukjin && s.card.month === 9);
+    g = resolveFlip(flipCard(flipCard(g, gukjin), pair));
+    expect(g.gukjinAsk).toBe('player');
+    expect(g.pendingGukjin).toMatchObject({ kind: 'turn' });
+    expect(g.phase).toBe('playing'); // 아직 고/스톱을 묻지 않는다
+    expect(g.turn).toBe('player'); // 턴도 넘어가지 않는다
+    const after = gameReducer(g, { type: 'GUKJIN', who: 'player', mode: 'auto' });
+    expect(after.pendingGukjin).toBe(null);
+    expect(after.turn === 'ai' || after.phase === 'gostop').toBe(true); // 이제서야 턴 마무리
+  });
+
   it('AI는 묻지 않고 늘 유리한 쪽으로 쓴다', () => {
     const g = cleanGame('normal');
     // 피 9장 + 국진을 AI가 가졌다면 쌍피로 세어 2점

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { newGame, applyAction, applyTimeout, applyForfeit, settleMoney, sideOf, RESOLVE_MIN_MS } from './pvp.js';
+import { newGame, applyAction, applyTimeout, applyForfeit, settleMoney, sideOf, seatOf, RESOLVE_MIN_MS } from './pvp.js';
 import { publicView, swapSides, peekCardsOf } from '../game/pvp.js';
 import { seededRng } from '../game/rng.js';
 import { aiChooseFlip, aiDecideGoStop } from '../game/engine.js';
@@ -93,7 +93,8 @@ describe('사람 대전: 서버 규칙', () => {
       const s = g.state;
       const seat = s.turn === 'player' ? 'A' : 'B';
       now += 1000;
-      if (s.phase === 'gostop') g = applyAction(g, seat, { type: aiDecideGoStop(s) === 'go' ? 'GO' : 'STOP' }, now);
+      if (s.gukjinAsk) g = applyAction(g, seatOf(s.gukjinAsk), { type: 'GUKJIN', mode: 'auto' }, now);
+      else if (s.phase === 'gostop') g = applyAction(g, seat, { type: aiDecideGoStop(s) === 'go' ? 'GO' : 'STOP' }, now);
       else if (s.flipped.length === 2) g = applyAction(g, seat, { type: 'RESOLVE' }, now);
       else g = applyAction(g, seat, { type: 'FLIP', index: aiChooseFlip(s) }, now);
     }
