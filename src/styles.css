@@ -41,6 +41,8 @@ body {
 .captured { --w: 36px; --gap: 12px; width: 100%; max-width: var(--game-max); background: rgba(255,255,255,0.07); border-radius: 12px; padding: 0.35rem 0.6rem 0.5rem; }
 @media (min-width: 700px) { .captured { --w: 48px; --gap: 18px; } }
 .captured header { display: flex; flex-wrap: wrap; align-items: center; gap: 0.25rem 0.6rem; margin-bottom: 0.25rem; }
+/* 이름이 길어도 줄바꿈으로 패널 높이가 변하지 않게 한 줄로 줄여서 보여 준다 */
+.captured header > strong { min-width: 0; max-width: 9em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .captured-score { margin-left: auto; font-weight: 900; }
 .pi-count { padding: 1px 8px; border-radius: 999px; font-size: 0.8rem; font-weight: 700; background: rgba(255,255,255,0.14); font-variant-numeric: tabular-nums; }
 .pi-count.enough { background: #ffd700; color: #1a1a2e; }
@@ -346,9 +348,17 @@ body:has(.burst-bomb) #root { animation: bomb-shake 0.6s ease-out; }
 .header-actions { display: flex; align-items: center; gap: 8px; flex: none; }
 .sound-controls.inline { position: static; gap: 6px; }
 .sound-controls.inline .icon-btn { width: 36px; height: 36px; border-radius: 10px; }
-.game-header .turn-indicator { min-width: 0; font-size: 0.95rem; }
+/* 상단 띠는 항상 한 줄: 이름이 길어도 줄바꿈으로 화면이 들썩이지 않게 한다 */
+.game-header { min-height: 46px; }
+.game-header .turn-indicator { display: flex; align-items: center; min-width: 0; font-size: 0.95rem; white-space: nowrap; overflow: hidden; }
+.turn-who { display: inline-flex; align-items: baseline; gap: 0.2em; min-width: 0; flex: 0 1 auto; overflow: hidden; }
+.turn-name { flex: 0 1 auto; min-width: 1.5em; max-width: 7em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: inherit; }
+.turn-fix { flex: none; }
+.tries, .time-left { flex: none; }
 @media (max-width: 420px) {
   .game-header .turn-indicator { padding: 0.4rem 0.6rem; font-size: 0.82rem; }
+  .turn-name { max-width: 6em; }
+  .tries-word { display: none; } /* 좁은 화면에서는 '카드 3/4' 처럼 짧게 (이름 자리를 남긴다) */
   .game-header .btn span { display: none; }
   .game-header .btn { padding: 0.45rem 0.6rem; }
 }

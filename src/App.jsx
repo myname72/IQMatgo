@@ -884,8 +884,13 @@ function Game({ state, send, onStart, settle, remote, remoteEnter }) {
     <div className="screen game-screen">
       <div className="game-header">
         <div className={`turn-indicator ${state.turn === 'player' ? 'mine' : 'theirs'}`}>
-          {state.turn === 'player' ? '🎮 당신의 턴' : `${remote ? '👤' : '🤖'} ${opp}의 턴`}
-          <span className="tries"> · 카드 {state.tries * 2 + state.flipped.length}/{MAX_FLIPS}장 오픈</span>
+          {state.turn === 'player' ? (
+            <span className="turn-who">🎮 당신의 턴</span>
+          ) : (
+            // 이름이 길어도 줄이 바뀌지 않도록 이름만 줄여서 한 줄로 보여 준다
+            <span className="turn-who"><span className="turn-fix">{remote ? '👤' : '🤖'}&nbsp;</span><b className="turn-name">{opp}</b><span className="turn-fix">의 턴</span></span>
+          )}
+          <span className="tries"> · <span className="tries-word">카드 </span>{state.tries * 2 + state.flipped.length}/{MAX_FLIPS}<span className="tries-word">장 오픈</span></span>
           {secondsLeft !== null && state.phase !== 'over' && <span className={`time-left ${secondsLeft <= 10 ? 'urgent' : ''}`}> · ⏱ {secondsLeft}초</span>}
         </div>
         <div className="header-actions">
