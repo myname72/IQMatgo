@@ -18,10 +18,13 @@ const need = (req) => {
 export const ensureWallet = onCall(opts, async (req) => {
   const uid = need(req);
   const ref = db.collection('users').doc(uid);
-  const name = String(req.auth.token.name ?? (req.auth.token.email ?? '').split('@')[0] ?? '').slice(0, 20);
+  // 가입 직후에는 토큰에 닉네임이 없을 수 있어, 그때만 클라이언트가 보낸 닉네임을 쓴다.
+  const given = String(req.data?.name ?? '').trim().slice(0, 20);
+  const name = String(req.auth.token.name || given || (req.auth.token.email ?? '').split('@')[0] || '').slice(0, 20);
   await db.runTransaction(async (tx) => {
     const snap = await tx.get(ref);
     if (!snap.exists) tx.set(ref, { points: START_POINTS, name, createdAt: FieldValue.serverTimestamp() });
+    else if (name && snap.data().name !== name) tx.update(ref, { name }); // 닉네임이 바뀌면 맞춰 준다
   });
   return { ok: true };
 });

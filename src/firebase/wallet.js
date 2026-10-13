@@ -19,18 +19,24 @@ export async function load() {
   return cached;
 }
 
+const userOf = (u) =>
+  (u ? { uid: u.uid, display: u.displayName ?? '', name: u.displayName || (u.email ?? '').split('@')[0], email: u.email ?? '' } : null);
+
+// 가입 직후처럼 닉네임이 나중에 정해지는 경우에 화면을 다시 그리기 위한 통로
+let userCb = null;
+
 // 로그인 상태가 바뀔 때마다 user(또는 null)를 알려 준다. 반환값은 구독 해제 함수.
 export function watchUser(cb) {
   let off = () => {};
   let dead = false;
+  userCb = cb;
   load().then((fb) => {
     if (!fb || dead) return;
-    off = fb.A.onAuthStateChanged(fb.auth, (u) =>
-      cb(u ? { uid: u.uid, name: u.displayName || (u.email ?? '').split('@')[0], email: u.email ?? '' } : null),
-    );
+    off = fb.A.onAuthStateChanged(fb.auth, (u) => cb(userOf(u)));
   });
   return () => {
     dead = true;
+    if (userCb === cb) userCb = null;
     off();
   };
 }
@@ -50,11 +56,15 @@ export async function signIn() {
   }
 }
 
-// 이메일 회원가입: 계정을 만들고 닉네임을 저장하면 끝 (메일 인증은 받지 않는다)
+// 이메일 회원가입: 계정을 만들고 닉네임을 저장한다 (메일 인증은 받지 않는다)
 export async function signUpEmail(email, password, name) {
   const fb = await load();
   const cred = await fb.A.createUserWithEmailAndPassword(fb.auth, email, password);
-  if (name) await fb.A.updateProfile(cred.user, { displayName: name });
+  if (!name) return;
+  await fb.A.updateProfile(cred.user, { displayName: name });
+  // 계정을 만들 때 받은 토큰에는 닉네임이 없다. 새로 받아야 서버도 닉네임을 안다.
+  await cred.user.getIdToken(true).catch(() => {});
+  if (userCb) userCb(userOf(fb.auth.currentUser)); // 화면에도 바로 닉네임이 보이게 한다
 }
 
 export async function signInEmail(email, password) {
@@ -80,7 +90,8 @@ export function watchWallet(user, cb, onError = () => {}) {
     if (!fb || dead) return;
     const ref = fb.F.doc(fb.fs, 'users', user.uid);
     // 지갑이 없으면 서버가 시작 포인트로 만든다. 서버 호출이 실패해도 이미 있는 지갑은 그대로 읽는다.
-    await call('ensureWallet', {}).catch(() => {});
+    // 닉네임은 토큰에 없을 수도 있어서 함께 보낸다 (서버가 토큰 쪽을 우선한다)
+    await call('ensureWallet', { name: user.display || '' }).catch(() => {});
     if (dead) return;
     off = fb.F.onSnapshot(ref, (s) => s.exists() && cb({ points: s.data().points, activeRoom: s.data().activeRoom ?? null }), onError);
   });
